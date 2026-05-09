@@ -1,0 +1,77 @@
+{
+  "models": [
+    { "id": "deepseek-v4-flash", "name": "DeepSeek-V4-Flash", "provider": "deepseek" },
+    { "id": "claude-opus-4-7", "name": "Claude Opus 4.7", "provider": "claude" },
+    { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "provider": "claude" },
+    { "id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5", "provider": "claude" }
+  ],
+  "prompts": [
+    {
+      "id": "S1",
+      "dimension": "简单任务",
+      "name": "环形进度条",
+      "output_type": "html",
+      "prompt": "你是资深前端工程师。请生成一个单文件 HTML 页面，实现\"带动画的环形进度条\"组件演示。\n\n功能要求：\n- 页面中有一个环形进度条，默认显示 0%\n- 点击 Start 后，进度从 0% 平滑增长到 100%\n- 动画过程必须连续、可视、平滑\n- 到达 100% 后弹出明显的 \"Done!\" 提示\n- 支持 Pause 暂停\n- 支持 Resume 继续\n- 支持 Reset 重置到 0%\n- 页面中要清楚显示当前百分比数值\n\n实现要求：\n- 使用原生 HTML + CSS + JavaScript\n- 输出单文件 HTML，不要拆文件\n- 不依赖打包工具\n- 页面要可直接本地打开运行\n- UI 简洁清晰，按钮状态明确\n- 不要输出解释，只输出完整可运行代码",
+      "checks": ["0% -> 100% 平滑加载", "Done 提示", "支持暂停", "支持继续", "有可见进度反馈"]
+    },
+    {
+      "id": "S2",
+      "dimension": "简单任务",
+      "name": "石头剪刀布",
+      "output_type": "html",
+      "prompt": "你是资深前端工程师。请生成一个单文件 HTML 网页，实现\"石头剪刀布\"对战小游戏。\n\n功能要求：\n- 玩家可点击 石头 / 剪刀 / 布 三个按钮进行选择\n- 按钮在点击前后要有轻微晃动或反馈动画\n- 电脑自动随机出拳\n- 页面实时展示本轮双方选择结果\n- 页面实时显示比分：玩家分 / 电脑分 / 平局数\n- 每轮结束后有明显的胜负动画或提示\n- 支持连续多轮游戏\n- 提供 Reset 按钮，重置比分与状态\n\n实现要求：\n- 使用原生 HTML + CSS + JavaScript\n- 输出单文件 HTML\n- 不要依赖后端\n- 页面本地打开即可运行\n- 视觉效果比纯文本结果更丰富，但不要过度复杂\n- 不要输出解释，只输出完整可运行代码",
+      "checks": ["晃动选择按钮", "电脑AI随机选择", "动态比分展示", "胜负动画效果"]
+    },
+    {
+      "id": "C1-1",
+      "dimension": "复杂任务",
+      "name": "跨文件生成-初始文件",
+      "output_type": "code",
+      "language": "python",
+      "prompt": "你是 Python 工程师。请在一个小型项目中创建以下文件，并输出完整代码。\n\n项目结构：\n- utils/logger.py\n- app/main.py\n\n要求：\n1. 在 utils/logger.py 中实现 save_log(log_data) 函数\n   - log_data 必须是字典\n   - 将传入数据保存到 logs.json\n   - 如果 logs.json 不存在则自动创建\n   - 新日志应追加保存，而不是覆盖旧日志\n\n2. 在 app/main.py 中实现主函数\n   - 调用 utils.logger.save_log\n   - 传入当前时间戳和用户 ID\n   - 代码可直接运行\n\n输出格式要求：\n- 按文件路径分块输出\n- 例如先输出 `# utils/logger.py`，再输出完整代码\n- 再输出 `# app/main.py`，再输出完整代码\n- 不要省略导入\n- 不要输出解释",
+      "checks": ["多文件创建是否正确", "目录结构", "函数签名", "日志写入是否成功"]
+    },
+    {
+      "id": "C1-2",
+      "dimension": "复杂任务",
+      "name": "跨文件生成-补导入和类型",
+      "output_type": "code",
+      "language": "python",
+      "prompt": "你是 Python 工程师。基于下面的项目结构继续完善代码：\n\n项目结构：\n- utils/logger.py\n- app/main.py\n\n目标：\n在 app/main.py 中调用 utils/logger.py 的 save_log 函数时，自动补全缺失的导入语句，并确保参数类型匹配。\n\n要求：\n- save_log(log_data) 的参数 log_data 必须为 dict\n- 如果 main.py 中原本传参不正确，请自动修正\n- 导入路径要正确\n- 项目执行时不能因导入或类型问题报错\n- 保持代码简洁清楚\n\n输出格式要求：\n- 按文件路径分块输出最终完整版本\n- 输出完整代码，不要只给 diff\n- 不要输出解释",
+      "checks": ["自动补导入", "参数类型", "跨文件引用", "可运行性"]
+    },
+    {
+      "id": "C2",
+      "dimension": "复杂任务",
+      "name": "太空餐厅点餐模拟器",
+      "output_type": "html",
+      "prompt": "你是擅长创意交互的前端工程师。请生成一个单文件 HTML Web 应用，实现\"太空餐厅点餐模拟器\"。\n\n功能要求：\n- 页面有太空背景\n- 用户可以点击或拖拽星座图标进行点餐\n- 例如把\"巨蟹座\"拖到烤架区域时，生成对应菜品（如牛排）\n- 如果出现错误搭配，要有明显的爆炸动画或错误反馈\n- 页面有一个人数滑块，拖动后餐盘大小要同步缩放\n- 双击太空背景时，召唤隐藏饮料飞碟\n- 至少包含 3 种可交互星座 / 菜品规则\n- 页面要有基本引导提示，避免完全不可理解\n\n实现要求：\n- 原生 HTML + CSS + JavaScript\n- 输出单文件 HTML\n- 本地直接运行\n- 尽量保证交互完整，不要只做静态示意图\n- 不要输出解释，只输出完整可运行代码",
+      "checks": ["多交互链路", "拖拽", "错误反馈", "缩放联动", "隐藏功能"]
+    },
+    {
+      "id": "P1",
+      "dimension": "响应速度",
+      "name": "记忆卡牌",
+      "output_type": "html",
+      "prompt": "你是前端工程师。请生成一个单文件 HTML 页面，实现 4x4 记忆卡牌配对游戏。\n\n功能要求：\n- 4x4 卡牌布局，共 16 张卡\n- 每张卡背后是动物 emoji\n- 点击卡牌可以翻开\n- 两张相同卡牌匹配成功后保持翻开\n- 不匹配则短暂显示后翻回去\n- 页面包含 60 秒倒计时\n- 倒计时结束且未完成配对时，显示失败状态并支持重置\n- 有重新开始按钮\n- 显示已匹配对数\n\n实现要求：\n- 使用原生 HTML + CSS + JavaScript\n- 输出单文件 HTML\n- 本地直接运行\n- 交互完整、规则正确\n- 不要输出解释，只输出完整可运行代码",
+      "checks": ["4x4布局", "点击翻牌", "匹配逻辑", "60秒倒计时", "失败重置"]
+    },
+    {
+      "id": "P2",
+      "dimension": "响应速度",
+      "name": "打砖块",
+      "output_type": "html",
+      "prompt": "你是前端工程师。请生成一个单文件 HTML 页面，实现经典打砖块小游戏。\n\n功能要求：\n- 使用鼠标控制底部反弹板左右移动\n- 小球碰到反弹板会反弹\n- 页面顶部有多块可破坏的彩色砖块\n- 小球击中砖块后砖块消失并加分\n- 页面实时显示分数\n- 小球掉落到底部后判定失败\n- 失败后显示 Retry 按钮\n- 点击 Retry 可以重新开始\n\n实现要求：\n- 使用原生 HTML + CSS + JavaScript\n- 输出单文件 HTML\n- 本地直接运行\n- 碰撞逻辑尽量正确\n- 不要输出解释，只输出完整可运行代码",
+      "checks": ["鼠标控制反弹板", "可破坏彩色砖块", "实时分数统计", "失败重试按钮"]
+    },
+    {
+      "id": "A1",
+      "dimension": "API兼容性",
+      "name": "百度地图 API",
+      "output_type": "code",
+      "language": "python",
+      "prompt": "你是 Python 工程师。请生成一段可直接运行的 Python 代码，调用百度地图地理编码 API，根据输入地址获取经纬度。\n\nAPI 要求：\n- 参数：\n  - ak = API 密钥\n  - address = 地址\n  - output = json\n\n代码要求：\n- 使用 requests 库\n- 使用 HTTPS 请求\n- 封装成函数，例如 geocode(address, ak)\n- 返回经纬度结果\n- 如果请求失败、地址无结果、参数错误，要有基本错误处理\n- 在 main 中给出示例调用方式\n- 输出完整可运行代码，不要输出解释",
+      "checks": ["参数是否正确", "HTTPS请求", "可执行性", "错误处理"]
+    }
+  ]
+}

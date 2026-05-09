@@ -1,0 +1,2289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM 网页生成效果对比工具</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="./lib/store.js"></script>
+    <style>
+        :root {
+            --bg-deep: #0c1222;
+            --bg-base: #131c31;
+            --bg-surface: #1a2540;
+            --bg-elevated: #223050;
+            --border-default: #1e3050;
+            --border-subtle: #162040;
+            --accent: #06d6a0;
+            --accent-dim: rgba(6,214,160,0.15);
+            --accent-glow: rgba(6,214,160,0.3);
+            --amber: #f59e0b;
+            --coral: #ff6b6b;
+            --text-primary: #e2e8f0;
+            --text-secondary: #8896b0;
+            --text-muted: #4a5a78;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0; padding: 0; height: 100vh;
+            display: flex; flex-direction: column; overflow: hidden;
+            background-color: var(--bg-deep);
+            color: var(--text-primary);
+            font-family: 'DM Sans', system-ui, sans-serif;
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-deep); }
+        ::-webkit-scrollbar-thumb { background: var(--bg-elevated); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        .header {
+            height: 56px; background: rgba(19,28,49,0.85);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-default);
+            box-shadow: 0 1px 20px rgba(6,214,160,0.06);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 20px; flex-shrink: 0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .header.session-active {
+            border-bottom-color: var(--accent);
+            box-shadow: 0 1px 24px rgba(6,214,160,0.15);
+        }
+
+        .main-content { display: flex; flex: 1; overflow: hidden; }
+
+        .sidebar {
+            width: 280px; background: var(--bg-base);
+            border-right: 1px solid var(--border-default);
+            display: flex; flex-direction: column; flex-shrink: 0;
+        }
+        .prompt-list { flex: 1; overflow-y: auto; padding: 8px; }
+        .prompt-item {
+            padding: 10px 12px; margin-bottom: 4px; border-radius: 6px;
+            cursor: pointer; border: 1px solid transparent;
+            border-left: 3px solid transparent;
+            transition: all 0.15s ease;
+        }
+        .prompt-item:hover { background: var(--bg-surface); border-left-color: var(--text-muted); }
+        .prompt-item.active {
+            background: var(--accent-dim);
+            border-left-color: var(--accent);
+            border-color: var(--border-default);
+        }
+        .prompt-badge {
+            font-size: 10px; padding: 2px 6px; border-radius: 3px;
+            background: var(--bg-elevated); color: var(--accent);
+            font-family: 'JetBrains Mono', monospace;
+            margin-right: 6px; letter-spacing: 0.5px;
+        }
+
+        .info-panel {
+            width: 320px; background: var(--bg-base);
+            border-right: 1px solid var(--border-default);
+            padding: 16px; display: flex; flex-direction: column;
+            overflow-y: auto; flex-shrink: 0;
+        }
+        .prompt-card {
+            background: var(--bg-surface); padding: 14px;
+            border-radius: 8px; border: 1px solid var(--border-default);
+            margin-bottom: 16px;
+        }
+        .prompt-card h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px; letter-spacing: 1px;
+            color: var(--accent); margin: 0 0 10px 0;
+        }
+        .checklist { list-style: none; padding: 0; margin: 0; }
+        .checklist li { display: flex; align-items: flex-start; margin-bottom: 8px; font-size: 13px; }
+        .checklist input { margin-top: 4px; margin-right: 8px; accent-color: var(--accent); }
+
+        .comparison-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .models-header {
+            display: flex; padding: 8px 12px;
+            background: var(--bg-base);
+            border-bottom: 1px solid var(--border-default);
+            align-items: center;
+        }
+        .model-select {
+            flex: 1; margin: 0 8px; padding: 6px 8px;
+            border: 1px solid var(--border-default); border-radius: 4px;
+            background: var(--bg-surface); color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+        }
+        .model-select:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }
+        .model-select:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .split-view { flex: 1; display: flex; overflow: hidden; position: relative; }
+        .model-pane {
+            flex: 1; display: flex; flex-direction: column;
+            border-right: 1px solid var(--border-default);
+            position: relative;
+        }
+        .model-pane:last-child { border-right: none; }
+        .pane-header {
+            padding: 6px 12px; background: var(--bg-surface);
+            border-bottom: 1px solid var(--border-default);
+            font-weight: 500; font-size: 13px;
+            display: flex; justify-content: space-between; align-items: center;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .iframe-container { flex: 1; background: #0a0f1a; position: relative; }
+        .result-iframe { width: 100%; height: 100%; border: none; }
+
+        .vote-float {
+            position: absolute; bottom: 20px; right: 20px;
+            display: none; z-index: 15; gap: 10px;
+        }
+        .vote-float.show {
+            display: flex;
+            animation: vote-appear 0.4s ease-out;
+        }
+        .vote-btn {
+            width: 52px; height: 52px; border-radius: 50%;
+            border: 2px solid var(--accent);
+            background: rgba(10,15,26,0.85);
+            backdrop-filter: blur(8px);
+            cursor: pointer; display: flex; align-items: center;
+            justify-content: center; font-size: 24px;
+            box-shadow: 0 0 16px var(--accent-glow);
+            transition: all 0.2s ease;
+        }
+        .vote-btn:hover {
+            transform: scale(1.15);
+            box-shadow: 0 0 28px var(--accent-glow);
+            background: var(--accent-dim);
+        }
+        .vote-btn.voted-up {
+            border-color: var(--accent); background: var(--accent);
+            box-shadow: 0 0 32px var(--accent-glow);
+            animation: vote-pop 0.3s ease-out;
+        }
+        .vote-btn.voted-down {
+            border-color: var(--coral); background: rgba(255,107,107,0.15);
+            box-shadow: 0 0 24px rgba(255,107,107,0.3);
+            animation: vote-pop 0.3s ease-out;
+        }
+
+        .placeholder {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; height: 100%; color: var(--text-muted);
+            text-align: center; padding: 20px;
+        }
+        .code-input-area {
+            position: absolute; inset: 0; background: var(--bg-base);
+            display: none; flex-direction: column; z-index: 10; padding: 20px;
+        }
+        .code-textarea {
+            flex: 1; width: 100%; padding: 12px;
+            font-family: 'JetBrains Mono', monospace; font-size: 13px;
+            border: 1px solid var(--border-default); border-radius: 6px;
+            resize: none; margin-bottom: 12px; box-sizing: border-box;
+            background: var(--bg-surface); color: var(--text-primary);
+        }
+        .code-textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }
+
+        .btn {
+            padding: 5px 12px; border-radius: 4px; font-size: 13px;
+            cursor: pointer; border: 1px solid transparent;
+            font-family: 'DM Sans', sans-serif; font-weight: 500;
+            transition: all 0.15s ease;
+        }
+        .btn-primary {
+            background: var(--accent); color: var(--bg-deep);
+            font-weight: 600;
+        }
+        .btn-primary:hover {
+            background: #05c493;
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+        .btn-primary:disabled { background: var(--text-muted); cursor: not-allowed; box-shadow: none; }
+        .btn-outline {
+            border-color: var(--border-default); background: transparent;
+            color: var(--text-secondary);
+        }
+        .btn-outline:hover {
+            border-color: var(--text-muted); color: var(--text-primary);
+            background: var(--bg-surface);
+        }
+        .btn-outline:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-green {
+            background: var(--accent); color: var(--bg-deep); font-weight: 600;
+        }
+        .btn-green:hover { background: #05c493; box-shadow: 0 0 16px var(--accent-glow); }
+        .btn-green:disabled { background: var(--text-muted); cursor: not-allowed; box-shadow: none; }
+        .btn-danger {
+            border-color: rgba(255,107,107,0.3); background: transparent;
+            color: var(--coral);
+        }
+        .btn-danger:hover { background: rgba(255,107,107,0.1); border-color: var(--coral); }
+
+        .loading-overlay {
+            position: absolute; inset: 0; display: flex;
+            flex-direction: column; align-items: center;
+            justify-content: end; z-index: 20; pointer-events: none;
+        }
+        .loading-bar {
+            background: rgba(10,15,26,0.9); padding: 6px 16px;
+            border-radius: 6px 6px 0 0;
+            border: 1px solid var(--border-default); border-bottom: none;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .loading-bar span { font-size: 12px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
+        .spinner {
+            width: 14px; height: 14px;
+            border: 2px solid var(--border-default);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin-glow 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+
+        .status-bar {
+            height: 26px; background: rgba(19,28,49,0.9);
+            border-top: 1px solid var(--border-default);
+            display: flex; align-items: center; padding: 0 16px;
+            font-size: 11px; color: var(--text-muted);
+            flex-shrink: 0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .api-config {
+            display: none; position: fixed; top: 56px; right: 0;
+            width: 400px; background: var(--bg-surface);
+            border-left: 1px solid var(--border-default);
+            border-bottom: 1px solid var(--border-default);
+            border-radius: 0 0 0 8px;
+            box-shadow: -4px 4px 24px rgba(0,0,0,0.3);
+            padding: 16px; z-index: 100;
+            max-height: calc(100vh - 82px); overflow-y: auto;
+        }
+        .api-config.show { display: block; }
+        .api-config label {
+            display: block; font-size: 11px; font-weight: 600;
+            color: var(--text-secondary); margin-bottom: 4px; margin-top: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.3px;
+        }
+        .api-config input, .api-config select {
+            width: 100%; padding: 7px 10px;
+            border: 1px solid var(--border-default); border-radius: 4px;
+            font-size: 13px; box-sizing: border-box;
+            background: var(--bg-base); color: var(--text-primary);
+            font-family: 'DM Sans', sans-serif;
+        }
+        .api-config input:focus, .api-config select:focus {
+            border-color: var(--accent); outline: none;
+            box-shadow: 0 0 0 2px var(--accent-dim);
+        }
+        .custom-model-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 10px; border: 1px solid var(--border-default);
+            border-radius: 6px; margin-bottom: 6px;
+            background: var(--bg-base);
+        }
+        .custom-model-item .info { flex: 1; min-width: 0; }
+        .custom-model-item .name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+        .custom-model-item .meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .provider-preset {
+            display: inline-block; padding: 3px 8px; margin: 2px;
+            border: 1px solid var(--border-default); border-radius: 12px;
+            font-size: 11px; cursor: pointer;
+            background: var(--bg-base); color: var(--text-secondary);
+            transition: all 0.15s ease;
+        }
+        .provider-preset:hover {
+            background: var(--accent-dim); border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .score-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .score-table th, .score-table td { border: 1px solid var(--border-default); padding: 4px 6px; text-align: center; }
+        .score-table th {
+            background: var(--bg-elevated); font-weight: 600; font-size: 10px;
+            color: var(--accent); font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.3px;
+        }
+        .score-table td.check-label {
+            text-align: left; font-size: 11px; color: var(--text-secondary);
+            max-width: 140px; word-wrap: break-word;
+        }
+        .score-table select {
+            padding: 2px 4px; border: 1px solid var(--border-default);
+            border-radius: 3px; font-size: 11px;
+            background: var(--bg-base); color: var(--text-primary);
+        }
+
+        .tab-btn {
+            background: transparent; color: var(--text-muted);
+            border: 1px solid transparent; cursor: pointer;
+            padding: 2px 8px; border-radius: 3px; font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.15s ease;
+        }
+        .tab-btn.active-tab {
+            background: var(--accent-dim); color: var(--accent);
+            border-color: var(--accent);
+        }
+        .tab-btn:hover:not(.active-tab) { color: var(--text-secondary); }
+
+        .source-view {
+            flex: 1; overflow: auto; background: var(--bg-deep);
+            display: none; padding: 16px;
+        }
+        .source-view pre { margin: 0; border-radius: 6px; border: 1px solid var(--border-default); }
+        .source-view code { font-size: 13px; line-height: 1.6; font-family: 'JetBrains Mono', monospace; }
+
+        /* Modals */
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: 50;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(6,9,18,0.7);
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.show { display: flex; animation: fade-in 0.2s ease-out; }
+        .modal-container {
+            background: var(--bg-surface); border: 1px solid var(--border-default);
+            border-radius: 12px; box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+            display: flex; flex-direction: column;
+            animation: modal-slide 0.25s ease-out;
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 20px; border-bottom: 1px solid var(--border-default);
+        }
+        .modal-header h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px; font-weight: 700; color: var(--text-primary);
+            margin: 0;
+        }
+        .modal-close {
+            background: none; border: none; color: var(--text-muted);
+            font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1;
+            transition: color 0.15s;
+        }
+        .modal-close:hover { color: var(--text-primary); }
+        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .modal-footer {
+            display: flex; justify-content: flex-end; gap: 8px;
+            padding: 12px 20px; border-top: 1px solid var(--border-default);
+        }
+
+        /* Session modal specific */
+        .session-model-list {
+            max-height: 200px; overflow-y: auto;
+            border: 1px solid var(--border-default); border-radius: 6px;
+            padding: 8px; margin-bottom: 16px;
+            background: var(--bg-base);
+        }
+        .session-model-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 8px; border-radius: 4px; cursor: pointer;
+            transition: background 0.15s;
+        }
+        .session-model-item:hover { background: var(--bg-elevated); }
+        .session-model-item input[type="checkbox"] {
+            accent-color: var(--accent); width: 16px; height: 16px;
+        }
+        .session-model-item span { font-size: 13px; color: var(--text-primary); }
+
+        /* Toggle switch for blind mode */
+        .toggle-switch {
+            position: relative; display: inline-block;
+            width: 40px; height: 22px;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; inset: 0; cursor: pointer;
+            background: var(--bg-elevated); border: 1px solid var(--border-default);
+            border-radius: 22px; transition: all 0.3s ease;
+        }
+        .toggle-slider::before {
+            content: ''; position: absolute;
+            width: 16px; height: 16px; left: 2px; bottom: 2px;
+            background: var(--text-muted); border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--accent-dim); border-color: var(--accent);
+        }
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(18px); background: var(--accent);
+            box-shadow: 0 0 8px var(--accent-glow);
+        }
+
+        /* Session label styling */
+        .session-label {
+            font-size: 12px; font-weight: 600; color: var(--text-secondary);
+            margin-bottom: 8px; display: block;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .session-select {
+            width: 100%; padding: 8px 12px;
+            border: 1px solid var(--border-default); border-radius: 6px;
+            font-size: 13px; background: var(--bg-base);
+            color: var(--text-primary); margin-bottom: 16px;
+        }
+        .session-select:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }
+
+        .session-error {
+            font-size: 12px; color: var(--coral); margin-bottom: 8px;
+            display: none; padding: 6px 10px; border-radius: 4px;
+            background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.2);
+        }
+
+        /* Animations */
+        @keyframes spin-glow { to { transform: rotate(360deg); } }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes modal-slide { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes vote-appear { from { opacity: 0; transform: scale(0.8) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes vote-pop { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+        @keyframes reveal-name {
+            from { opacity: 0; transform: translateY(6px); color: var(--accent); }
+            to { opacity: 1; transform: translateY(0); color: var(--text-primary); }
+        }
+        .reveal-animate { animation: reveal-name 0.6s ease-out; }
+
+        /* Batch progress bar */
+        .batch-bar-track { background: var(--bg-elevated); }
+        .batch-bar-fill { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+
+        @media (max-width: 1024px) {
+            .split-view { flex-direction: column; }
+            .model-pane { border-right: none; border-bottom: 1px solid var(--border-default); }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <div class="flex items-center gap-4">
+            <h1 class="text-lg font-bold" style="font-family:'JetBrains Mono',monospace; color:var(--accent); letter-spacing:-0.5px;">&lt;/&gt; Benchmark</h1>
+            <span style="font-size:11px; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">v2.0</span>
+        </div>
+        <div class="flex gap-2">
+            <button class="btn btn-primary" id="session-btn" onclick="openSessionModal()">新建会话</button>
+            <button class="btn btn-outline" id="end-session-btn" style="display:none;" onclick="endSession()">结束会话</button>
+            <button class="btn btn-outline" id="blind-toggle" onclick="toggleBlindMode()">盲评: 关</button>
+            <button class="btn btn-outline" onclick="toggleApiConfig()">API 配置</button>
+            <button class="btn btn-outline" onclick="showStats()">统计</button>
+            <button class="btn btn-outline" onclick="showHistory()">历史</button>
+            <button class="btn btn-primary" onclick="exportResults()">导出</button>
+        </div>
+    </header>
+
+    <!-- API 配置面板 -->
+    <div class="api-config" id="api-config">
+        <div class="flex justify-between items-center mb-2">
+            <span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; color:var(--text-primary);">API 配置</span>
+            <button class="modal-close" onclick="toggleApiConfig()">&times;</button>
+        </div>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">内置模型已自动加载。下方可添加自定义 OpenAI 兼容 API 模型。</p>
+
+        <!-- Preset provider quick-fill -->
+        <div style="margin-top:0;">
+            <label>快速填充 Base URL</label>
+            <div id="provider-presets"></div>
+        </div>
+
+        <!-- Add custom model form -->
+        <label>Base URL <span style="font-weight:400; color:var(--text-muted);">(必填)</span></label>
+        <input type="text" id="custom-base-url" placeholder="https://api.openai.com/v1">
+
+        <label>API Key <span style="font-weight:400; color:var(--text-muted);">(必填)</span></label>
+        <input type="password" id="custom-api-key" placeholder="sk-...">
+
+        <label>模型 ID <span style="font-weight:400; color:var(--text-muted);">(必填)</span></label>
+        <input type="text" id="custom-model-id" placeholder="gpt-4o / gemini-2.0-flash">
+
+        <label>显示名称 <span style="font-weight:400; color:var(--text-muted);">(可选)</span></label>
+        <input type="text" id="custom-model-name" placeholder="GPT-4o">
+
+        <button class="btn btn-primary w-full mt-3" onclick="addCustomModel()">添加模型</button>
+
+        <!-- Custom model list -->
+        <div id="custom-model-list" class="mt-3"></div>
+    </div>
+
+    <div class="main-content">
+        <aside class="sidebar">
+            <div style="padding:10px 12px; border-bottom:1px solid var(--border-default); background:var(--bg-surface);">
+                <div class="flex items-center justify-between mb-2">
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:var(--text-secondary);">测试用例 (<span id="prompt-count">0</span>)</span>
+                    <label class="flex items-center gap-1 cursor-pointer" style="font-size:11px; color:var(--text-muted);">
+                        <input type="checkbox" id="batch-select-all" onchange="toggleSelectAll(this.checked)" style="accent-color:var(--accent);">
+                        全选
+                    </label>
+                </div>
+                <button class="btn btn-green w-full text-sm" id="batch-run-btn" onclick="startBatchRun()">批量运行</button>
+                <div id="batch-progress" style="display:none; margin-top:8px;">
+                    <span id="batch-progress-text" style="font-size:11px; color:var(--text-muted);">0/0</span>
+                    <div class="w-full rounded-full h-1.5 mt-1 batch-bar-track">
+                        <div id="batch-progress-bar" class="h-1.5 rounded-full transition-all batch-bar-fill" style="width:0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="prompt-list" id="prompt-list"></div>
+        </aside>
+
+        <section class="info-panel">
+            <div id="prompt-detail-container" style="display: none;">
+                <div class="mb-2">
+                    <span id="detail-dimension" style="font-size:10px; padding:2px 8px; border-radius:3px; background:var(--accent-dim); color:var(--accent); font-family:'JetBrains Mono',monospace; margin-right:8px;">Simple</span>
+                    <span id="detail-id" style="font-size:12px; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">S1</span>
+                </div>
+                <h2 id="detail-name" style="font-size:16px; font-weight:700; margin:0 0 12px 0; color:var(--text-primary);">环形进度条</h2>
+
+                <div class="prompt-card">
+                    <h3>Prompt 提示词</h3>
+                    <p id="detail-prompt" style="font-size:13px; color:var(--text-secondary); line-height:1.6; margin:0 0 10px 0;"></p>
+                    <button style="background:none; border:none; color:var(--accent); font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px; padding:0;" onclick="copyPrompt(this)">
+                        <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        复制 Prompt
+                    </button>
+                </div>
+
+                <div class="prompt-card">
+                    <h3>模型检查点评分</h3>
+                    <div id="model-scores-container"><p style="font-size:11px; color:var(--text-muted);">选择测试用例后显示评分表</p></div>
+                </div>
+
+                <div id="score-actions" style="display:none;" class="mt-4 flex flex-col gap-2">
+                    <button class="btn btn-primary w-full" onclick="saveScores()">保存本次评分</button>
+                    <button class="btn btn-outline w-full" onclick="exportResults()">导出所有结果 (JSON)</button>
+                </div>
+            </div>
+
+            <div id="empty-state" class="placeholder">
+                <svg style="width:48px; height:48px; margin-bottom:12px; color:var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                <p style="font-size:13px;">请在左侧选择一个测试用例</p>
+            </div>
+        </section>
+
+        <main class="comparison-area">
+            <div class="models-header" id="models-header">
+                <div class="flex items-center gap-2 px-4">
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--text-muted);">SPLIT</span>
+                    <select id="pane-count" class="model-select" style="flex:none; margin:0 4px; width:auto;" onchange="rebuildPanes()">
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                    </select>
+                    <button class="btn btn-green text-sm" onclick="generateAll()">全部生成</button>
+                </div>
+            </div>
+
+            <div class="split-view" id="split-view">
+            </div>
+        </main>
+    </div>
+
+    <div id="stats-modal" class="modal-overlay">
+        <div class="modal-container" style="width:66%; max-height:80vh;">
+            <div class="modal-header">
+                <h3>模型统计</h3>
+                <button class="modal-close" onclick="closeStats()">&times;</button>
+            </div>
+            <div class="modal-body" id="stats-content">
+                <p style="color:var(--text-muted); font-size:12px;">加载中...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="history-modal" class="modal-overlay">
+        <div class="modal-container" style="width:75%; max-height:80vh;">
+            <div class="modal-header">
+                <h3>历史记录</h3>
+                <div class="flex items-center gap-2">
+                    <button class="btn btn-danger text-sm" onclick="clearHistory()">清空</button>
+                    <button class="modal-close" onclick="closeHistory()">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body" id="history-content">
+                <p style="color:var(--text-muted); font-size:12px;">加载中...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="session-modal" class="modal-overlay">
+        <div class="modal-container" style="width:480px; max-height:80vh;">
+            <div class="modal-header">
+                <h3>新建评测会话</h3>
+                <button class="modal-close" onclick="closeSessionModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label class="session-label">选择评测模型 <span style="font-weight:400; color:var(--text-muted);">(至少 2 个)</span></label>
+                <div id="session-model-list" class="session-model-list"></div>
+
+                <div class="flex items-center justify-between mb-4">
+                    <span style="font-size:13px; color:var(--text-secondary);">启用盲评模式</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="session-blind-mode">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <label class="session-label">分屏数量</label>
+                <select id="session-pane-count" class="session-select">
+                    <option value="2">2 分屏</option>
+                    <option value="3">3 分屏</option>
+                    <option value="4">4 分屏</option>
+                </select>
+
+                <div id="session-error" class="session-error"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeSessionModal()">取消</button>
+                <button class="btn btn-primary" onclick="startSession()">开始评测</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar" id="status-bar">就绪</div>
+
+    <script>
+        // ===== HTML 转义 (防止 XSS) =====
+        function esc(s) {
+            if (!s) return '';
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+        let MODELS = [];
+        let promptsData = [];
+
+        const PROXY_URL = '/v1/chat/completions';
+        const CLAUDE_URL = '/v1/claude-code';
+
+        const CLAUDE_MODELS = new Set([
+            'claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001',
+        ]);
+
+        const CLAUDE_DISPLAY_NAME = {
+            'claude-opus-4-7': 'GLM-5.1 (Opus)',
+            'claude-sonnet-4-6': 'GLM-5-Turbo (Sonnet)',
+            'claude-haiku-4-5-20251001': 'GLM-4.7 (Haiku)',
+        };
+
+        function isClaudeModel(modelId) { return CLAUDE_MODELS.has(modelId); }
+        function getModelDisplayName(modelId, fallback) {
+            return CLAUDE_DISPLAY_NAME[modelId] || fallback || modelId;
+        }
+
+        let currentPrompt = null;
+
+        // ===== 从 prompts.json 加载数据 =====
+        async function loadData() {
+            try {
+                var resp = await fetch('./prompts.json');
+                var data = await resp.json();
+                MODELS = data.models || [];
+                promptsData = data.prompts || [];
+                document.getElementById('prompt-count').textContent = promptsData.length;
+            } catch (e) {
+                console.error('Failed to load prompts.json', e);
+                document.getElementById('prompt-count').textContent = '0';
+                document.getElementById('prompt-list').innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--coral);">prompts.json 加载失败，请检查文件是否存在</div>';
+            }
+        }
+
+        // ===== API 配置管理 =====
+        const PROVIDER_PRESETS = [
+            { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
+            { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1' },
+            { name: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai' },
+            { name: 'Anthropic (proxy)', baseUrl: 'https://api.anthropic.com/v1' },
+            { name: '智谱 GLM', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
+            { name: '通义千问', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+            { name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1' },
+            { name: 'Together AI', baseUrl: 'https://api.together.xyz/v1' },
+            { name: 'Mistral', baseUrl: 'https://api.mistral.ai/v1' },
+            { name: '硅基流动', baseUrl: 'https://api.siliconflow.cn/v1' },
+            { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1' },
+            { name: '自定义', baseUrl: '' },
+        ];
+
+        const CUSTOM_MODELS_KEY = 'benchmark_custom_models';
+        const ACTIVE_SESSION_KEY = 'benchmark_active_session_id';
+
+        function getCustomModels() {
+            try {
+                return JSON.parse(localStorage.getItem(CUSTOM_MODELS_KEY)) || [];
+            } catch (e) { return []; }
+        }
+
+        function saveCustomModels(models) {
+            localStorage.setItem(CUSTOM_MODELS_KEY, JSON.stringify(models));
+        }
+
+        function getAllModels() {
+            return MODELS.concat(getCustomModels());
+        }
+
+        function isCustomModel(modelId) {
+            return getCustomModels().some(function(m) { return m.id === modelId; });
+        }
+
+        function getCustomModelConfig(modelId) {
+            return getCustomModels().find(function(m) { return m.id === modelId; }) || null;
+        }
+
+        // keep as init trigger
+        function loadApiConfig() {
+            // Render provider preset buttons
+            var presetsEl = document.getElementById('provider-presets');
+            presetsEl.textContent = '';
+            PROVIDER_PRESETS.forEach(function(p) {
+                var btn = document.createElement('button');
+                btn.className = 'provider-preset';
+                btn.textContent = p.name;
+                btn.onclick = function() {
+                    if (p.baseUrl) {
+                        document.getElementById('custom-base-url').value = p.baseUrl;
+                    }
+                    document.getElementById('custom-model-id').focus();
+                };
+                presetsEl.appendChild(btn);
+            });
+            renderCustomModelList();
+        }
+
+        function renderCustomModelList() {
+            var listEl = document.getElementById('custom-model-list');
+            listEl.textContent = '';
+            var models = getCustomModels();
+            if (models.length === 0) return;
+            models.forEach(function(m) {
+                var item = document.createElement('div');
+                item.className = 'custom-model-item';
+                var info = document.createElement('div');
+                info.className = 'info';
+                var nameSpan = document.createElement('div');
+                nameSpan.className = 'name';
+                nameSpan.textContent = m.display_name || m.id;
+                var metaSpan = document.createElement('div');
+                metaSpan.className = 'meta';
+                metaSpan.textContent = m.id + ' @ ' + new URL(m.base_url).hostname;
+                info.appendChild(nameSpan);
+                info.appendChild(metaSpan);
+                var delBtn = document.createElement('button');
+                delBtn.className = 'text-red-400 hover:text-red-600 text-xs';
+                delBtn.textContent = '删除';
+                delBtn.onclick = function() { removeCustomModel(m.id); };
+                item.appendChild(info);
+                item.appendChild(delBtn);
+                listEl.appendChild(item);
+            });
+        }
+
+        async function addCustomModel() {
+            if (activeSession) { alert('会话期间无法添加模型'); return; }
+            var baseUrl = document.getElementById('custom-base-url').value.trim();
+            var apiKey = document.getElementById('custom-api-key').value.trim();
+            var modelId = document.getElementById('custom-model-id').value.trim();
+            var displayName = document.getElementById('custom-model-name').value.trim() || modelId;
+
+            if (!baseUrl || !apiKey || !modelId) {
+                alert('请填写 Base URL、API Key 和模型 ID');
+                return;
+            }
+
+            // Register host with server
+            try {
+                var hostname = new URL(baseUrl).hostname;
+                await fetch('/v1/hosts/allow', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ hostname: hostname }),
+                });
+            } catch (e) { /* ignore host registration failure */ }
+
+            var models = getCustomModels();
+            // Update if exists, else add
+            var existing = models.findIndex(function(m) { return m.id === modelId; });
+            var entry = {
+                id: modelId,
+                display_name: displayName,
+                base_url: baseUrl,
+                api_key: apiKey,
+                provider: 'custom',
+            };
+            if (existing >= 0) {
+                models[existing] = entry;
+            } else {
+                models.push(entry);
+            }
+            saveCustomModels(models);
+
+            // Clear form
+            document.getElementById('custom-base-url').value = '';
+            document.getElementById('custom-api-key').value = '';
+            document.getElementById('custom-model-id').value = '';
+            document.getElementById('custom-model-name').value = '';
+
+            renderCustomModelList();
+            rebuildPanes();
+            setStatus('已添加模型: ' + displayName);
+        }
+
+        function removeCustomModel(modelId) {
+            if (activeSession) { alert('会话期间无法删除模型'); return; }
+            var models = getCustomModels().filter(function(m) { return m.id !== modelId; });
+            saveCustomModels(models);
+            renderCustomModelList();
+            rebuildPanes();
+        }
+
+        function saveApiConfig() { /* no-op, models are added inline */ }
+
+        function saveApiConfig() { toggleApiConfig(); }
+
+        function toggleApiConfig() {
+            document.getElementById('api-config').classList.toggle('show');
+        }
+
+        function getApiForModel(modelId) { return { ok: true }; }
+
+        // ===== 状态栏 =====
+        function setStatus(msg) {
+            document.getElementById('status-bar').textContent = msg;
+        }
+
+        // ===== 动态分屏 =====
+        function createPaneElement(index) {
+            var pane = document.createElement('div');
+            pane.className = 'model-pane';
+            pane.id = 'pane-' + index;
+
+            // Header
+            var header = document.createElement('div');
+            header.className = 'pane-header';
+
+            var leftGroup = document.createElement('div');
+            leftGroup.className = 'flex items-center gap-2';
+
+            var select = document.createElement('select');
+            select.id = 'select-' + index;
+            select.className = 'model-select';
+            select.style.flex = '1';
+            select.style.margin = '0 4px';
+            select.style.padding = '4px 6px';
+
+            var sessionModels = activeSession ? activeSession.models : null;
+
+            if (sessionModels) {
+                sessionModels.forEach(function(m, i) {
+                    var opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = m.display_name || m.id;
+                    if (i === index) opt.selected = true;
+                    select.appendChild(opt);
+                });
+                select.disabled = true;
+            } else {
+                MODELS.forEach(function(m, i) {
+                    var opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = getModelDisplayName(m.id, m.name);
+                    if (i === index) opt.selected = true;
+                    select.appendChild(opt);
+                });
+                getCustomModels().forEach(function(m) {
+                    var opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = m.display_name || m.id;
+                    select.appendChild(opt);
+                });
+            }
+
+            select.addEventListener('change', function() {
+                var selected = MODELS.find(function(m) { return m.id === select.value; });
+                var custom = getCustomModelConfig(select.value);
+                document.getElementById('model-name-' + index).textContent =
+                    selected ? getModelDisplayName(selected.id, selected.name) :
+                    custom ? (custom.display_name || custom.id) : '-';
+            });
+
+            var tabGroup = document.createElement('div');
+            tabGroup.className = 'flex gap-1';
+
+            var previewTab = document.createElement('button');
+            previewTab.className = 'tab-btn active-tab';
+            previewTab.dataset.pane = index;
+            previewTab.dataset.view = 'preview';
+            previewTab.textContent = '预览';
+            previewTab.onclick = function() { switchView(String(index), 'preview'); };
+
+            var sourceTab = document.createElement('button');
+            sourceTab.className = 'tab-btn';
+            sourceTab.dataset.pane = index;
+            sourceTab.dataset.view = 'source';
+            sourceTab.textContent = '源码';
+            sourceTab.onclick = function() { switchView(String(index), 'source'); };
+
+            tabGroup.appendChild(previewTab);
+            tabGroup.appendChild(sourceTab);
+
+            var modelName = document.createElement('span');
+            modelName.id = 'model-name-' + index;
+            if (sessionModels) {
+                modelName.textContent = sessionModels[index] ? (sessionModels[index].display_name || sessionModels[index].id) : '-';
+            } else {
+                modelName.textContent = MODELS[index] ? getModelDisplayName(MODELS[index].id, MODELS[index].name) : '-';
+            }
+
+            leftGroup.appendChild(modelName);
+            leftGroup.appendChild(tabGroup);
+            leftGroup.appendChild(select);
+
+            var rightGroup = document.createElement('div');
+            rightGroup.className = 'flex items-center gap-2';
+
+            var stats = document.createElement('span');
+            stats.id = 'stats-' + index;
+            stats.style.cssText = 'font-size:11px; color:var(--text-muted); font-family:"JetBrains Mono",monospace;';
+
+            var codeBtn = document.createElement('button');
+            codeBtn.style.cssText = 'background:none; border:none; font-size:11px; color:var(--accent); cursor:pointer; padding:0;';
+            codeBtn.textContent = '输入代码';
+            codeBtn.onclick = function() { toggleCodeInput(String(index)); };
+
+            var clearBtn = document.createElement('button');
+            clearBtn.style.cssText = 'background:none; border:none; font-size:11px; color:var(--text-muted); cursor:pointer; padding:0;';
+            clearBtn.textContent = '清空';
+            clearBtn.onclick = function() { clearPreview(String(index)); };
+
+            rightGroup.appendChild(stats);
+            rightGroup.appendChild(codeBtn);
+            rightGroup.appendChild(clearBtn);
+
+            header.appendChild(leftGroup);
+            header.appendChild(rightGroup);
+
+            // iframe container
+            var iframeContainer = document.createElement('div');
+            iframeContainer.className = 'iframe-container';
+
+            var placeholder = document.createElement('div');
+            placeholder.className = 'placeholder';
+            placeholder.id = 'placeholder-' + index;
+            var p1 = document.createElement('p');
+            p1.className = 'mb-2';
+            p1.textContent = '暂无生成内容';
+            var p2 = document.createElement('p');
+            p2.className = 'text-xs';
+            p2.textContent = '选择测试用例后点击"全部生成"';
+            placeholder.appendChild(p1);
+            placeholder.appendChild(p2);
+
+            var iframe = document.createElement('iframe');
+            iframe.className = 'result-iframe';
+            iframe.id = 'iframe-' + index;
+            iframe.style.display = 'none';
+            iframe.sandbox = 'allow-scripts';
+
+            var loading = document.createElement('div');
+            loading.className = 'loading-overlay';
+            loading.id = 'loading-' + index;
+            loading.style.display = 'none';
+            var loadBar = document.createElement('div');
+            loadBar.className = 'loading-bar';
+            var spinner = document.createElement('div');
+            spinner.className = 'spinner';
+            var loadText = document.createElement('span');
+            loadText.id = 'loading-text-' + index;
+            loadText.textContent = '生成中...';
+            loadBar.appendChild(spinner);
+            loadBar.appendChild(loadText);
+            loading.appendChild(loadBar);
+
+            var codeInput = document.createElement('div');
+            codeInput.className = 'code-input-area';
+            codeInput.id = 'code-input-' + index;
+            var h4 = document.createElement('h4');
+            h4.style.cssText = 'font-size:13px; font-weight:600; margin:0 0 8px 0; color:var(--text-secondary);';
+            h4.textContent = '粘贴生成的代码';
+            var textarea = document.createElement('textarea');
+            textarea.className = 'code-textarea';
+            textarea.id = 'textarea-' + index;
+            textarea.placeholder = '粘贴代码...';
+            var btnGroup = document.createElement('div');
+            btnGroup.className = 'flex justify-end gap-2';
+            var cancelBtn = document.createElement('button');
+            cancelBtn.className = 'btn btn-outline';
+            cancelBtn.textContent = '取消';
+            cancelBtn.onclick = function() { toggleCodeInput(String(index)); };
+            var renderBtn = document.createElement('button');
+            renderBtn.className = 'btn btn-primary';
+            renderBtn.textContent = '渲染预览';
+            renderBtn.onclick = function() { renderCode(String(index)); };
+            btnGroup.appendChild(cancelBtn);
+            btnGroup.appendChild(renderBtn);
+            codeInput.appendChild(h4);
+            codeInput.appendChild(textarea);
+            codeInput.appendChild(btnGroup);
+
+            iframeContainer.appendChild(placeholder);
+            iframeContainer.appendChild(iframe);
+            iframeContainer.appendChild(loading);
+            iframeContainer.appendChild(codeInput);
+
+            // Vote float buttons (up/down) inside each pane
+            var voteFloat = document.createElement('div');
+            voteFloat.className = 'vote-float';
+            voteFloat.id = 'vote-float-' + index;
+
+            var upBtn = document.createElement('button');
+            upBtn.className = 'vote-btn';
+            upBtn.id = 'vote-up-' + index;
+            upBtn.innerHTML = '&#128077;';
+            upBtn.title = '这个更好';
+            upBtn.onclick = function() { voteForPane(String(index), 'up'); };
+
+            var downBtn = document.createElement('button');
+            downBtn.className = 'vote-btn';
+            downBtn.id = 'vote-down-' + index;
+            downBtn.innerHTML = '&#128078;';
+            downBtn.title = '这个较差';
+            downBtn.onclick = function() { voteForPane(String(index), 'down'); };
+
+            voteFloat.appendChild(upBtn);
+            voteFloat.appendChild(downBtn);
+            iframeContainer.appendChild(voteFloat);
+
+            // Source view
+            var sourceView = document.createElement('div');
+            sourceView.className = 'source-view';
+            sourceView.id = 'source-' + index;
+            var pre = document.createElement('pre');
+            var code = document.createElement('code');
+            code.className = 'hljs';
+            code.id = 'source-code-' + index;
+            pre.appendChild(code);
+            sourceView.appendChild(pre);
+
+            pane.appendChild(header);
+            pane.appendChild(iframeContainer);
+            pane.appendChild(sourceView);
+
+            return pane;
+        }
+
+        function rebuildPanes() {
+            if (activeSession) {
+                document.getElementById('pane-count').value = String(activeSession.paneCount);
+            }
+            var count = parseInt(document.getElementById('pane-count').value);
+            var container = document.getElementById('split-view');
+            while (container.firstChild) container.removeChild(container.firstChild);
+
+            for (var i = 0; i < count; i++) {
+                container.appendChild(createPaneElement(i));
+            }
+        }
+
+        function generateAll() {
+            if (!currentPrompt) { alert('请先选择一个测试用例'); return; }
+            var count = parseInt(document.getElementById('pane-count').value);
+            paneStatuses = {};
+            setStatus('正在并行生成 ' + count + ' 个模型...');
+            var promises = [];
+            for (var i = 0; i < count; i++) {
+                (function(idx) {
+                    promises.push(
+                        generate(String(idx)).catch(function(err) {
+                            console.error('[generateAll] pane', idx, 'failed:', err);
+                        })
+                    );
+                })(i);
+            }
+            return Promise.all(promises).then(function() {
+                setStatus('全部生成完成');
+            });
+        }
+
+        // ===== 列表渲染 (使用 DOM API 代替 innerHTML) =====
+        function renderList() {
+            const listEl = document.getElementById('prompt-list');
+            while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+
+            promptsData.forEach(function(item) {
+                const el = document.createElement('div');
+                el.className = 'prompt-item';
+                el.dataset.promptId = item.id;
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'batch-check mr-2 mt-1 cursor-pointer';
+                checkbox.dataset.promptId = item.id;
+                checkbox.onclick = function(e) { e.stopPropagation(); };
+                el.appendChild(checkbox);
+
+                var contentWrapper = document.createElement('div');
+                contentWrapper.className = 'flex-1 min-w-0';
+                contentWrapper.onclick = function() { selectPrompt(item, el); };
+
+                const topRow = document.createElement('div');
+                topRow.className = 'flex items-center mb-1';
+
+                const badge = document.createElement('span');
+                badge.className = 'prompt-badge';
+                badge.textContent = item.dimension;
+
+                const idSpan = document.createElement('span');
+                idSpan.style.cssText = 'font-size:11px; color:var(--text-muted); font-family:"JetBrains Mono",monospace; margin-left:auto;';
+                idSpan.textContent = item.id;
+
+                topRow.appendChild(badge);
+                topRow.appendChild(idSpan);
+
+                const nameDiv = document.createElement('div');
+                nameDiv.style.cssText = 'font-weight:500; font-size:13px; color:var(--text-primary);';
+                nameDiv.textContent = item.name;
+
+                const descDiv = document.createElement('div');
+                descDiv.style.cssText = 'font-size:11px; color:var(--text-muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+                descDiv.textContent = item.prompt;
+
+                contentWrapper.appendChild(topRow);
+                contentWrapper.appendChild(nameDiv);
+                contentWrapper.appendChild(descDiv);
+                el.appendChild(contentWrapper);
+                listEl.appendChild(el);
+            });
+        }
+
+        function selectPrompt(item, element) {
+            currentPrompt = item;
+            document.querySelectorAll('.prompt-item').forEach(function(el) { el.classList.remove('active'); });
+            if (element) element.classList.add('active');
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('prompt-detail-container').style.display = 'block';
+            document.getElementById('score-actions').style.display = 'flex';
+            document.getElementById('detail-id').textContent = item.id;
+            document.getElementById('detail-dimension').textContent = item.dimension;
+            document.getElementById('detail-name').textContent = item.name;
+            document.getElementById('detail-prompt').textContent = item.prompt;
+
+            // Build per-model check-score table
+            buildModelScores();
+        }
+
+        function copyPrompt(btn) {
+            if (!currentPrompt) return;
+            var originalText = btn.innerHTML;
+            navigator.clipboard.writeText(currentPrompt.prompt).then(function() {
+                btn.innerHTML = '<svg style="width:14px; height:14px; margin-right:4px; color:var(--accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> <span style="color:var(--accent);">已复制!</span>';
+                setTimeout(function() { btn.innerHTML = originalText; }, 2000);
+            });
+        }
+
+        // ===== 代码输入 / 渲染 =====
+        function toggleCodeInput(paneId) {
+            var el = document.getElementById('code-input-' + paneId);
+            el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
+            if (el.style.display === 'flex') document.getElementById('textarea-' + paneId).focus();
+        }
+
+        function renderCode(paneId) {
+            var code = document.getElementById('textarea-' + paneId).value;
+            var iframe = document.getElementById('iframe-' + paneId);
+            var placeholder = document.getElementById('placeholder-' + paneId);
+            if (code.trim()) {
+                placeholder.style.display = 'none';
+                iframe.style.display = 'block';
+                document.getElementById('code-input-' + paneId).style.display = 'none';
+                iframe.srcdoc = code;
+            } else {
+                alert('请先输入代码');
+            }
+        }
+
+        function clearPreview(paneId) {
+            var iframe = document.getElementById('iframe-' + paneId);
+            var placeholder = document.getElementById('placeholder-' + paneId);
+            document.getElementById('textarea-' + paneId).value = '';
+            iframe.style.display = 'none';
+            placeholder.style.display = 'flex';
+            document.getElementById('stats-' + paneId).textContent = '';
+            var sourceCode = document.getElementById('source-code-' + paneId);
+            if (sourceCode) sourceCode.textContent = '';
+            switchView(paneId, 'preview');
+            iframe.srcdoc = '';
+        }
+
+        // ===== 提取 HTML 代码块 =====
+        function extractHtml(text) {
+            var htmlBlock = text.match(/```html\s*\n([\s\S]*?)```/i);
+            if (htmlBlock) return htmlBlock[1].trim();
+            var codeBlock = text.match(/```\s*\n([\s\S]*?)```/);
+            if (codeBlock) {
+                var content = codeBlock[1].trim();
+                if (content.toLowerCase().indexOf('<!doctype') !== -1 || content.toLowerCase().indexOf('<html') !== -1) {
+                    return content;
+                }
+            }
+            var trimmed = text.trim();
+            if (trimmed.toLowerCase().indexOf('<!doctype') === 0 || trimmed.toLowerCase().indexOf('<html') === 0) {
+                return trimmed;
+            }
+            var htmlMatch = text.match(/(<html[\s\S]*<\/html>)/i);
+            if (htmlMatch) return htmlMatch[1].trim();
+            return null;
+        }
+
+        // ===== View switching =====
+        function switchView(paneId, view) {
+            var iframeContainer = document.querySelector('#pane-' + paneId + ' .iframe-container');
+            var sourceView = document.getElementById('source-' + paneId);
+
+            document.querySelectorAll('[data-pane="' + paneId + '"].tab-btn').forEach(function(btn) {
+                btn.classList.remove('active-tab');
+                if (btn.dataset.view === view) btn.classList.add('active-tab');
+            });
+
+            if (view === 'preview') {
+                iframeContainer.style.display = 'flex';
+                sourceView.style.display = 'none';
+            } else {
+                iframeContainer.style.display = 'none';
+                sourceView.style.display = 'block';
+            }
+        }
+
+        // ===== API 调用 =====
+        let activeGenerations = 0;
+        let paneStatuses = {};
+
+        function updateStatusBar() {
+            var parts = [];
+            var keys = Object.keys(paneStatuses);
+            for (var i = 0; i < keys.length; i++) {
+                parts.push(keys[i] + ': ' + paneStatuses[keys[i]]);
+            }
+            setStatus(parts.join(' | ') || '就绪');
+        }
+
+        async function generate(paneId) {
+            if (!currentPrompt) {
+                alert('请先选择一个测试用例');
+                return;
+            }
+
+            var select = document.getElementById('select-' + paneId);
+            var modelId = select ? select.value : '';
+            if (!modelId) { setStatus('请选择模型'); return; }
+            var modelObj = MODELS.find(function(m) { return m.id === modelId; });
+            var modelName = modelObj ? getModelDisplayName(modelObj.id, modelObj.name) : modelId;
+
+            var loadingEl = document.getElementById('loading-' + paneId);
+            var placeholder = document.getElementById('placeholder-' + paneId);
+            var iframe = document.getElementById('iframe-' + paneId);
+            var statsEl = document.getElementById('stats-' + paneId);
+
+            if (!loadingEl || !placeholder || !iframe || !statsEl) return;
+
+            loadingEl.style.display = 'flex';
+            placeholder.style.display = 'none';
+            iframe.style.display = 'none';
+            statsEl.textContent = '';
+            switchView(paneId, 'source');
+            paneStatuses[paneId] = modelName + ' 生成中...';
+            updateStatusBar();
+
+            var startTime = performance.now();
+            activeGenerations++;
+
+            try {
+                var systemPrompt = currentPrompt.output_type === 'html'
+                    ? '你是一个前端开发专家。请根据用户的描述，生成一个完整的、可直接运行的 HTML 文件（包含所有 CSS 和 JS）。直接输出完整的 HTML 代码，不要使用任何工具或文件操作，不要输出任何解释或说明文字。'
+                    : '你是一个编程专家。请根据用户的描述，生成完整的代码。直接输出代码，不要使用任何工具或文件操作，不要输出任何解释或说明文字。';
+
+                var apiUrl = isClaudeModel(modelId) ? CLAUDE_URL : PROXY_URL;
+
+                // Validate: custom model must have credentials, non-claude non-custom must be in .env
+                if (!isClaudeModel(modelId) && !getCustomModelConfig(modelId)) {
+                    var builtIn = MODELS.find(function(m) { return m.id === modelId; });
+                    if (!builtIn) {
+                        throw new Error('未知模型: ' + modelId + '，请在 API 配置中添加');
+                    }
+                }
+
+                var requestBody = {
+                    model: modelId,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: currentPrompt.prompt },
+                    ],
+                    max_tokens: 16384,
+                    temperature: 0.7,
+                    stream: true,
+                };
+
+                // Attach inline credentials for custom models
+                var customConf = getCustomModelConfig(modelId);
+                if (customConf) {
+                    requestBody.base_url = customConf.base_url;
+                    requestBody.api_key = customConf.api_key;
+                }
+
+                console.log('[generate] pane', paneId, 'model', modelId, 'fetch START', new Date().toISOString());
+
+                var response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody),
+                });
+
+                if (!response.ok) {
+                    var errBody = await response.text();
+                    throw new Error('HTTP ' + response.status + ': ' + errBody.substring(0, 200));
+                }
+
+                console.log('[generate] pane', paneId, 'model', modelId, 'response OK', new Date().toISOString());
+
+                // Read SSE stream
+                var reader = response.body.getReader();
+                var decoder = new TextDecoder();
+                var fullContent = '';
+                var buffer = '';
+                var inputTokens = 0;
+                var outputTokens = 0;
+
+                var loadingText = document.getElementById('loading-text-' + paneId);
+
+                var streamDone = false;
+
+                while (true) {
+                    var chunk = await reader.read();
+                    var lines = [];
+                    if (chunk.done) {
+                        if (buffer.trim()) lines = buffer.split('\n');
+                        buffer = '';
+                        streamDone = true;
+                    } else {
+                        buffer += decoder.decode(chunk.value, { stream: true });
+                        lines = buffer.split('\n');
+                        buffer = lines.pop();
+                    }
+
+                    for (var i = 0; i < lines.length; i++) {
+                        var line = lines[i].trim();
+                        if (!line || !line.startsWith('data: ')) continue;
+                        var data = line.slice(6);
+                        if (data === '[DONE]') { streamDone = true; break; }
+
+                        try {
+                            var parsed = JSON.parse(data);
+                            var delta = parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
+                            if (delta && delta.content) {
+                                fullContent += delta.content;
+                                loadingText.textContent = '生成中... ' + fullContent.length + ' 字符';
+                                // Stream source code view in real-time
+                                var sourceCode = document.getElementById('source-code-' + paneId);
+                                if (sourceCode) {
+                                    sourceCode.textContent = fullContent;
+                                }
+                            }
+                            if (parsed.usage) {
+                                inputTokens = parsed.usage.prompt_tokens || 0;
+                                outputTokens = parsed.usage.completion_tokens || 0;
+                                console.log('[generate] pane', paneId, 'usage received:', inputTokens, '/', outputTokens);
+                            }
+                        } catch (e) { /* skip malformed chunks */ }
+                    }
+
+                    if (streamDone) break;
+                }
+
+                console.log('[generate] pane', paneId, 'stream DONE');
+                var elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+                var totalTokens = inputTokens + outputTokens;
+                var speed = elapsed > 0 ? (outputTokens / parseFloat(elapsed)).toFixed(1) : '0';
+                statsEl.textContent = elapsed + 's | ' + totalTokens + ' tokens (in:' + inputTokens + ' out:' + outputTokens + ') | ' + speed + ' tok/s';
+                console.log('[generate] pane', paneId, 'COMPLETE', elapsed + 's', inputTokens + '/' + outputTokens);
+                paneStatuses[paneId] = modelName + ' 完成 ' + elapsed + 's';
+                updateStatusBar();
+                BenchmarkStore.add('generations', {
+                    prompt_id: currentPrompt.id,
+                    prompt_name: currentPrompt.name,
+                    model_id: modelId,
+                    model_name: modelName,
+                    elapsed_seconds: parseFloat(elapsed),
+                    input_tokens: inputTokens,
+                    output_tokens: outputTokens,
+                    total_tokens: totalTokens,
+                    timestamp: new Date().toISOString(),
+                }).catch(function() {});
+
+                // Always populate source view
+                var sourceCode = document.getElementById('source-code-' + paneId);
+                sourceCode.textContent = fullContent;
+                sourceCode.removeAttribute('data-highlighted');
+                hljs.highlightElement(sourceCode);
+
+                // Render based on output_type
+                if (currentPrompt.output_type === 'html') {
+                    var html = extractHtml(fullContent);
+                    if (html) {
+                        placeholder.style.display = 'none';
+                        iframe.style.display = 'block';
+                        iframe.srcdoc = html;
+                        switchView(paneId, 'preview');
+                    } else {
+                        placeholder.style.display = 'none';
+                        switchView(paneId, 'source');
+                    }
+                } else {
+                    placeholder.style.display = 'none';
+                    switchView(paneId, 'source');
+                }
+                if (blindMode && activeGenerations <= 1) showVoteFloats();
+            } catch (err) {
+                console.error('[generate] pane', paneId, 'error:', err.message);
+                paneStatuses[paneId] = modelName + ' 失败';
+                updateStatusBar();
+                placeholder.style.display = 'flex';
+            } finally {
+                loadingEl.style.display = 'none';
+                activeGenerations--;
+                if (activeGenerations <= 0) {
+                    activeGenerations = 0;
+                }
+            }
+        }
+
+        // ===== 盲评模式 =====
+        let blindMode = false;
+        let blindAssignments = [];
+
+        function shuffleArray(arr) {
+            var a = arr.slice();
+            for (var i = a.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+            }
+            return a;
+        }
+
+        function toggleBlindMode() {
+            if (activeSession) return;
+            blindMode = !blindMode;
+            var btn = document.getElementById('blind-toggle');
+            btn.textContent = '盲评模式: ' + (blindMode ? '开' : '关');
+
+            var count = parseInt(document.getElementById('pane-count') ? document.getElementById('pane-count').value : '2');
+
+            if (blindMode) {
+                var allModels = getAllModels();
+                if (allModels.length === 0) { alert('请先加载模型列表'); blindMode = false; btn.textContent = '盲评模式: 关'; return; }
+                // Randomly pick models for each pane (no duplicates, from built-in + custom)
+                var shuffled = shuffleArray(allModels);
+                blindAssignments = [];
+                for (var i = 0; i < count; i++) {
+                    var nameEl = document.getElementById('model-name-' + i);
+                    var selectEl = document.getElementById('select-' + i);
+                    if (!nameEl || !selectEl) continue;
+
+                    var picked = shuffled[i % shuffled.length];
+                    selectEl.value = picked.id;
+                    selectEl.style.display = 'none';
+                    nameEl.textContent = '模型 ' + (i + 1);
+
+                    blindAssignments.push(picked.id);
+                }
+                buildModelScores();
+                setStatus('盲评模式已开启 - 模型已随机分配，生成后投票揭晓');
+            } else {
+                blindAssignments = [];
+                for (var i = 0; i < count; i++) {
+                    var nameEl = document.getElementById('model-name-' + i);
+                    var selectEl = document.getElementById('select-' + i);
+                    if (!nameEl || !selectEl) continue;
+
+                    selectEl.style.display = '';
+                    var model = MODELS.find(function(m) { return m.id === selectEl.value; });
+                    var custom = getCustomModelConfig(selectEl.value);
+                    nameEl.textContent = model ? getModelDisplayName(model.id, model.name) :
+                        custom ? (custom.display_name || custom.id) : '-';
+                }
+                hideAllVoteFloats();
+                buildModelScores();
+                setStatus('盲评模式已关闭');
+            }
+        }
+
+        function showVoteFloats() {
+            var count = parseInt(document.getElementById('pane-count').value);
+            for (var i = 0; i < count; i++) {
+                var el = document.getElementById('vote-float-' + i);
+                if (el) el.classList.add('show');
+            }
+        }
+
+        function hideAllVoteFloats() {
+            var floats = document.querySelectorAll('.vote-float');
+            floats.forEach(function(el) { el.classList.remove('show'); });
+            var btns = document.querySelectorAll('.vote-btn');
+            btns.forEach(function(b) { b.classList.remove('voted-up', 'voted-down'); });
+        }
+
+        function voteForPane(paneId, direction) {
+            if (!blindMode || !blindAssignments.length) return;
+            var idx = parseInt(paneId);
+            var modelId = blindAssignments[idx];
+            var m = MODELS.find(function(m) { return m.id === modelId; });
+            var label = m ? getModelDisplayName(m.id, m.name) : modelId;
+            var custom = !m ? getCustomModelConfig(modelId) : null;
+            if (custom) label = custom.display_name || custom.id;
+
+            // Highlight the clicked button
+            var count = parseInt(document.getElementById('pane-count').value);
+            for (var i = 0; i < count; i++) {
+                var upBtn = document.getElementById('vote-up-' + i);
+                var downBtn = document.getElementById('vote-down-' + i);
+                if (upBtn) upBtn.classList.remove('voted-up', 'voted-down');
+                if (downBtn) downBtn.classList.remove('voted-up', 'voted-down');
+            }
+            if (direction === 'up') {
+                var btn = document.getElementById('vote-up-' + paneId);
+                if (btn) btn.classList.add('voted-up');
+            } else {
+                var btn = document.getElementById('vote-down-' + paneId);
+                if (btn) btn.classList.add('voted-down');
+            }
+
+            // Build result: the up-voted model wins
+            var choice = direction === 'up' ? String(idx) : findOtherPane(paneId, count);
+            var labels = blindAssignments.map(function(mid) {
+                var mm = MODELS.find(function(m) { return m.id === mid; });
+                if (mm) return getModelDisplayName(mm.id, mm.name);
+                var cc = getCustomModelConfig(mid);
+                return cc ? (cc.display_name || cc.id) : mid;
+            });
+            var resultLabel = direction === 'up'
+                ? labels[idx] + ' 胜'
+                : labels[parseInt(choice)] + ' 胜';
+
+            var result = {
+                prompt_id: currentPrompt.id,
+                prompt_name: currentPrompt.name,
+                models: blindAssignments.slice(),
+                model_names: labels.slice(),
+                vote: choice,
+                winner: choice === 'tie' ? 'tie' : blindAssignments[parseInt(choice)] || '',
+                timestamp: new Date().toISOString(),
+            };
+            saveVote(result);
+            setStatus('投票结果: ' + resultLabel);
+
+            if (activeSession) {
+                setTimeout(function() {
+                    revealBlindIdentities();
+                }, 1500);
+            } else {
+                setTimeout(function() {
+                    toggleBlindMode();
+                }, 1500);
+            }
+        }
+
+        function findOtherPane(paneId, count) {
+            for (var i = 0; i < count; i++) {
+                if (String(i) !== paneId) return String(i);
+            }
+            return 'tie';
+        }
+
+
+        function saveVote(result) {
+            BenchmarkStore.add('votes', result);
+        }
+
+        // ===== 会话管理 =====
+        let activeSession = null;
+
+        function openSessionModal() {
+            if (activeSession) { alert('请先结束当前会话'); return; }
+            var listEl = document.getElementById('session-model-list');
+            listEl.textContent = '';
+            var allModels = getAllModels();
+            allModels.forEach(function(m) {
+                var item = document.createElement('div');
+                item.className = 'session-model-item';
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = m.id;
+                cb.dataset.displayName = m.display_name || m.name || m.id;
+                cb.dataset.provider = m.provider || 'custom';
+                var text = document.createElement('span');
+                text.textContent = m.display_name || m.name || m.id;
+                item.appendChild(cb);
+                item.appendChild(text);
+                listEl.appendChild(item);
+            });
+            document.getElementById('session-error').style.display = 'none';
+            document.getElementById('session-error').className = 'session-error';
+            document.getElementById('session-blind-mode').checked = false;
+            document.getElementById('session-pane-count').value = '2';
+            document.getElementById('session-modal').classList.add('show');
+        }
+
+        function closeSessionModal() {
+            document.getElementById('session-modal').classList.remove('show');
+        }
+
+        function startSession() {
+            var checkboxes = document.querySelectorAll('#session-model-list input[type="checkbox"]:checked');
+            var selectedModels = [];
+            checkboxes.forEach(function(cb) {
+                selectedModels.push({
+                    id: cb.value,
+                    display_name: cb.dataset.displayName,
+                    provider: cb.dataset.provider,
+                });
+            });
+
+            var errorEl = document.getElementById('session-error');
+            if (selectedModels.length < 2) {
+                errorEl.textContent = '请至少选择 2 个模型';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            var paneCount = parseInt(document.getElementById('session-pane-count').value);
+            if (selectedModels.length < paneCount) {
+                errorEl.textContent = '选择的模型数量 (' + selectedModels.length + ') 少于分屏数量 (' + paneCount + ')';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            var blindEnabled = document.getElementById('session-blind-mode').checked;
+            var sessionModels = blindEnabled ? shuffleArray(selectedModels) : selectedModels.slice(0, paneCount);
+
+            activeSession = {
+                id: 'session-' + Date.now(),
+                models: sessionModels.slice(0, paneCount),
+                blindMode: blindEnabled,
+                paneCount: paneCount,
+                createdAt: new Date().toISOString(),
+                status: 'active',
+            };
+
+            BenchmarkStore.put('sessions', activeSession).catch(function(e) {
+                console.error('Failed to persist session', e);
+            });
+            localStorage.setItem(ACTIVE_SESSION_KEY, activeSession.id);
+
+            closeSessionModal();
+            applySessionUI();
+            setStatus('会话已开始 - ' + paneCount + ' 个模型已锁定');
+        }
+
+        function applySessionUI() {
+            if (!activeSession) return;
+
+            var paneCountEl = document.getElementById('pane-count');
+            paneCountEl.value = String(activeSession.paneCount);
+            paneCountEl.disabled = true;
+
+            blindMode = activeSession.blindMode;
+            blindAssignments = activeSession.models.map(function(m) { return m.id; });
+
+            var blindBtn = document.getElementById('blind-toggle');
+            blindBtn.disabled = true;
+            blindBtn.textContent = activeSession.blindMode
+                ? '盲评模式: 开 (会话锁定)'
+                : '盲评模式: 关 (会话锁定)';
+
+            rebuildPanes();
+
+            if (activeSession.blindMode) {
+                for (var i = 0; i < activeSession.paneCount; i++) {
+                    var selectEl = document.getElementById('select-' + i);
+                    var nameEl = document.getElementById('model-name-' + i);
+                    if (selectEl) selectEl.style.display = 'none';
+                    if (nameEl) nameEl.textContent = '模型 ' + (i + 1);
+                }
+            }
+
+            document.getElementById('session-btn').style.display = 'none';
+            document.getElementById('end-session-btn').style.display = '';
+            document.querySelector('.header').classList.add('session-active');
+
+            buildModelScores();
+        }
+
+        function endSession() {
+            if (!activeSession) return;
+
+            activeSession.status = 'completed';
+            BenchmarkStore.put('sessions', activeSession).catch(function() {});
+
+            activeSession = null;
+            blindMode = false;
+            blindAssignments = [];
+            localStorage.removeItem(ACTIVE_SESSION_KEY);
+
+            restoreFreeModeUI();
+            setStatus('会话已结束');
+        }
+
+        function restoreFreeModeUI() {
+            var paneCountEl = document.getElementById('pane-count');
+            paneCountEl.disabled = false;
+
+            var blindBtn = document.getElementById('blind-toggle');
+            blindBtn.textContent = '盲评模式: 关';
+            blindBtn.disabled = false;
+
+            document.getElementById('session-btn').style.display = '';
+            document.getElementById('end-session-btn').style.display = 'none';
+            document.querySelector('.header').classList.remove('session-active');
+
+            hideAllVoteFloats();
+            rebuildPanes();
+        }
+
+        async function restoreSession() {
+            var sessionId = localStorage.getItem(ACTIVE_SESSION_KEY);
+            if (!sessionId) return;
+
+            try {
+                var session = await BenchmarkStore.get('sessions', sessionId);
+                if (!session || session.status !== 'active') {
+                    localStorage.removeItem(ACTIVE_SESSION_KEY);
+                    return;
+                }
+                activeSession = session;
+                applySessionUI();
+                setStatus('已恢复会话 - ' + session.paneCount + ' 个模型已锁定');
+            } catch (e) {
+                console.error('Failed to restore session', e);
+                localStorage.removeItem(ACTIVE_SESSION_KEY);
+            }
+        }
+
+        function revealBlindIdentities() {
+            for (var i = 0; i < blindAssignments.length; i++) {
+                var nameEl = document.getElementById('model-name-' + i);
+                var modelId = blindAssignments[i];
+                var m = MODELS.find(function(m) { return m.id === modelId; });
+                var custom = !m ? getCustomModelConfig(modelId) : null;
+                var label = m ? getModelDisplayName(m.id, m.name) : (custom ? (custom.display_name || custom.id) : modelId);
+                if (nameEl) {
+                    nameEl.textContent = label;
+                    nameEl.classList.add('reveal-animate');
+                }
+            }
+            hideAllVoteFloats();
+            var blindBtn = document.getElementById('blind-toggle');
+            if (blindBtn) blindBtn.textContent = '盲评模式: 已揭晓';
+        }
+
+        // ===== 模型检查点评分表 =====
+        function getPaneModels() {
+            var count = parseInt(document.getElementById('pane-count').value);
+            var models = [];
+            for (var i = 0; i < count; i++) {
+                var selectEl = document.getElementById('select-' + i);
+                if (!selectEl) continue;
+                var modelId = selectEl.value;
+                var modelObj = MODELS.find(function(m) { return m.id === modelId; });
+                var custom = getCustomModelConfig(modelId);
+                var name, actualId;
+                if (blindMode) {
+                    name = '模型 ' + (i + 1);
+                    actualId = modelId;
+                } else if (modelObj) {
+                    name = getModelDisplayName(modelObj.id, modelObj.name);
+                    actualId = modelId;
+                } else if (custom) {
+                    name = custom.display_name || custom.id;
+                    actualId = modelId;
+                } else {
+                    name = modelId;
+                    actualId = modelId;
+                }
+                models.push({ paneIdx: i, modelId: actualId, displayName: name });
+            }
+            return models;
+        }
+
+        function buildModelScores() {
+            var container = document.getElementById('model-scores-container');
+            container.textContent = '';
+
+            if (!currentPrompt) {
+                container.innerHTML = '<p style="font-size:11px; color:var(--text-muted);">选择测试用例后显示评分表</p>';
+                return;
+            }
+
+            var paneModels = getPaneModels();
+            if (paneModels.length < 1) {
+                container.innerHTML = '<p style="font-size:11px; color:var(--text-muted);">无可用模型</p>';
+                return;
+            }
+
+            var checks = currentPrompt.checks;
+            if (!checks || checks.length === 0) {
+                container.innerHTML = '<p style="font-size:11px; color:var(--text-muted);">当前用例无检查点</p>';
+                return;
+            }
+
+            // Build score table: rows = checks, columns = models
+            var table = document.createElement('table');
+            table.className = 'score-table';
+
+            // Header row
+            var thead = document.createElement('thead');
+            var headRow = document.createElement('tr');
+            var thCheck = document.createElement('th');
+            thCheck.textContent = '检查点';
+            thCheck.style.textAlign = 'left';
+            headRow.appendChild(thCheck);
+
+            paneModels.forEach(function(pm) {
+                var th = document.createElement('th');
+                th.textContent = pm.displayName;
+                headRow.appendChild(th);
+            });
+            thead.appendChild(headRow);
+            table.appendChild(thead);
+
+            // Body rows
+            var tbody = document.createElement('tbody');
+            checks.forEach(function(check, checkIdx) {
+                var tr = document.createElement('tr');
+
+                var tdLabel = document.createElement('td');
+                tdLabel.className = 'check-label';
+                tdLabel.textContent = check;
+                tr.appendChild(tdLabel);
+
+                paneModels.forEach(function(pm) {
+                    var td = document.createElement('td');
+                    var sel = document.createElement('select');
+                    sel.id = 'mcheck-' + pm.paneIdx + '-' + checkIdx;
+                    ['通过', '部分', '失败'].forEach(function(val, vi) {
+                        var opt = document.createElement('option');
+                        opt.value = val === '通过' ? 'pass' : val === '部分' ? 'partial' : 'fail';
+                        opt.textContent = val;
+                        sel.appendChild(opt);
+                    });
+                    td.appendChild(sel);
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            container.appendChild(table);
+
+            // Comment per model
+            var commentDiv = document.createElement('div');
+            commentDiv.className = 'mt-3';
+            commentDiv.id = 'model-comments-container';
+            paneModels.forEach(function(pm) {
+                var row = document.createElement('div');
+                row.className = 'mb-2';
+                var label = document.createElement('label');
+                label.style.cssText = 'font-size:11px; font-weight:500; color:var(--text-secondary); display:block; margin-bottom:4px;';
+                label.textContent = pm.displayName + ' 评语';
+                var textarea = document.createElement('textarea');
+                textarea.style.cssText = 'width:100%; font-size:11px; border:1px solid var(--border-default); border-radius:4px; padding:6px; resize:none; background:var(--bg-base); color:var(--text-primary);';
+                textarea.rows = 2;
+                textarea.placeholder = '可选';
+                textarea.id = 'model-comment-' + pm.paneIdx;
+                row.appendChild(label);
+                row.appendChild(textarea);
+                commentDiv.appendChild(row);
+            });
+            container.appendChild(commentDiv);
+        }
+
+        // ===== 评分与导出 =====
+        function saveScores() {
+            if (!currentPrompt) return;
+
+            var paneModels = getPaneModels();
+            var checks = currentPrompt.checks;
+
+            // Collect per-model per-check scores
+            var modelScores = [];
+            paneModels.forEach(function(pm) {
+                var checkResults = [];
+                checks.forEach(function(check, checkIdx) {
+                    var sel = document.getElementById('mcheck-' + pm.paneIdx + '-' + checkIdx);
+                    checkResults.push({
+                        check: check,
+                        score: sel ? sel.value : 'fail',
+                    });
+                });
+                var passCount = checkResults.filter(function(c) { return c.score === 'pass'; }).length;
+                var partialCount = checkResults.filter(function(c) { return c.score === 'partial'; }).length;
+                var commentEl = document.getElementById('model-comment-' + pm.paneIdx);
+                modelScores.push({
+                    model_id: pm.modelId,
+                    model_name: pm.displayName,
+                    checks: checkResults,
+                    pass_rate: checks.length > 0 ? passCount / checks.length : 0,
+                    pass_count: passCount,
+                    partial_count: partialCount,
+                    fail_count: checks.length - passCount - partialCount,
+                    comment: commentEl ? commentEl.value.trim() : '',
+                });
+            });
+
+            var record = {
+                prompt_id: currentPrompt.id,
+                prompt_name: currentPrompt.name,
+                dimension: currentPrompt.dimension,
+                model_scores: modelScores,
+                timestamp: new Date().toISOString(),
+            };
+
+            BenchmarkStore.add('results', record);
+            setStatus('评分已保存 - ' + currentPrompt.name);
+        }
+
+        async function exportResults() {
+            var results = await BenchmarkStore.getAll('results');
+            var votes = await BenchmarkStore.getAll('votes');
+
+            var exportData = {
+                exported_at: new Date().toISOString(),
+                results: results,
+                votes: votes,
+            };
+
+            var blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'benchmark-results-' + new Date().toISOString().slice(0, 10) + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            setStatus('已导出 ' + results.length + ' 条评分结果 + ' + votes.length + ' 条投票记录');
+        }
+
+        // ===== 批量运行 =====
+        let batchRunning = false;
+
+        function toggleSelectAll(checked) {
+            document.querySelectorAll('.batch-check').forEach(function(cb) {
+                cb.checked = checked;
+            });
+        }
+
+        function getSelectedPromptIds() {
+            var ids = [];
+            document.querySelectorAll('.batch-check:checked').forEach(function(cb) {
+                ids.push(cb.dataset.promptId);
+            });
+            return ids;
+        }
+
+        async function startBatchRun() {
+            if (batchRunning) return;
+            var ids = getSelectedPromptIds();
+            if (ids.length === 0) { alert('请先勾选要运行的测试用例'); return; }
+            if (!currentPrompt && ids.length > 0) {
+                var firstPrompt = promptsData.find(function(p) { return p.id === ids[0]; });
+                if (firstPrompt) selectPrompt(firstPrompt, null);
+            }
+
+            batchRunning = true;
+            var btn = document.getElementById('batch-run-btn');
+            btn.disabled = true;
+            btn.textContent = '运行中...';
+
+            var progressEl = document.getElementById('batch-progress');
+            var progressText = document.getElementById('batch-progress-text');
+            var progressBar = document.getElementById('batch-progress-bar');
+            progressEl.style.display = 'block';
+
+            try {
+                for (var i = 0; i < ids.length; i++) {
+                    var prompt = promptsData.find(function(p) { return p.id === ids[i]; });
+                    if (!prompt) continue;
+
+                    selectPrompt(prompt, null);
+                    document.querySelectorAll('.prompt-item').forEach(function(item) {
+                        item.classList.toggle('active', item.dataset.promptId === ids[i]);
+                    });
+
+                    var paneCount = parseInt(document.getElementById('pane-count').value);
+                    for (var p = 0; p < paneCount; p++) {
+                        await generate(String(p));
+                    }
+
+                    progressText.textContent = (i + 1) + '/' + ids.length + ' (' + prompt.name + ')';
+                    progressBar.style.width = ((i + 1) / ids.length * 100) + '%';
+                }
+
+                setStatus('批量运行完成: ' + ids.length + ' 个用例');
+            } finally {
+                batchRunning = false;
+                btn.disabled = false;
+                btn.textContent = '批量运行';
+            }
+        }
+
+        // ===== 历史记录 =====
+        async function showHistory() {
+            document.getElementById('history-modal').classList.add('show');
+            var content = document.getElementById('history-content');
+            content.textContent = '加载中...';
+
+            try {
+                var results = await BenchmarkStore.getAll('results');
+                var votes = await BenchmarkStore.getAll('votes');
+
+                if (results.length === 0 && votes.length === 0) {
+                    content.textContent = '暂无历史记录';
+                    return;
+                }
+
+                var html = '';
+
+                if (results.length > 0) {
+                    html += '<h4 style="font-size:13px; font-weight:600; color:var(--text-primary); margin:0 0 8px 0;">评分记录 (' + results.length + ')</h4>';
+                    results.forEach(function(r) {
+                        html += '<div style="margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--border-subtle);">';
+                        html += '<div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span style="font-weight:500; font-size:13px; color:var(--text-primary);">' + esc(r.prompt_name || r.prompt_id) + '</span><span style="font-size:11px; color:var(--text-muted);">' + esc((r.timestamp || '').slice(0, 16)) + '</span></div>';
+                        var scores = r.model_scores || r.model_ratings || [];
+                        if (scores.length > 0) {
+                            html += '<table class="w-full text-xs border-collapse">';
+                            // Determine if we have per-check data (new format) or just rating (old format)
+                            var hasChecks = scores[0] && scores[0].checks && scores[0].checks.length > 0;
+                            if (hasChecks) {
+                                html += '<thead><tr style="border:1px solid var(--border-default); padding:2px 6px; text-align:center;" style="background:var(--bg-elevated); color:var(--accent); font-size:10px;"><th class="border px-2 py-1 text-left">模型</th>';
+                                var checkNames = scores[0].checks.map(function(c) { return c.check; });
+                                checkNames.forEach(function(cn) {
+                                    html += '<th style="border:1px solid var(--border-default); padding:2px 6px; text-align:center;" style="font-size:10px;max-width:100px;word-wrap:break-word;">' + esc(cn) + '</th>';
+                                });
+                                html += '<th style="border:1px solid var(--border-default); padding:2px 6px; text-align:center;">通过率</th></tr></thead><tbody>';
+                                scores.forEach(function(ms) {
+                                    html += '<tr><td class="border px-2 py-1 font-medium whitespace-nowrap">' + esc(ms.model_name) + '</td>';
+                                    ms.checks.forEach(function(c) {
+                                        var color = c.score === 'pass' ? '#22c55e' : c.score === 'partial' ? '#eab308' : '#ef4444';
+                                        var label = c.score === 'pass' ? '通过' : c.score === 'partial' ? '部分' : '失败';
+                                        html += '<td class="border px-2 py-1 text-center" style="color:' + color + '">' + label + '</td>';
+                                    });
+                                    var rate = (ms.pass_rate * 100).toFixed(0);
+                                    html += '<td class="border px-2 py-1 text-center font-semibold">' + rate + '%</td></tr>';
+                                    if (ms.comment) {
+                                        html += '<tr><td style="border:1px solid var(--border-default); padding:2px 6px; color:var(--text-muted); font-size:11px;" colspan="' + (checkNames.length + 2) + '">' + esc(ms.comment) + '</td></tr>';
+                                    }
+                                });
+                            } else {
+                                html += '<thead><tr style="border:1px solid var(--border-default); padding:2px 6px; text-align:center;" style="background:var(--bg-elevated); color:var(--accent); font-size:10px;"><th class="border px-2 py-1 text-left">模型</th><th style="border:1px solid var(--border-default); padding:2px 6px; text-align:center;">评分</th></tr></thead><tbody>';
+                                scores.forEach(function(ms) {
+                                    html += '<tr><td style="border:1px solid var(--border-default); padding:2px 6px; text-align:center;">' + esc(ms.model_name) + '</td>';
+                                    if (ms.comment) html += '<td style="border:1px solid var(--border-default); padding:2px 6px; color:var(--text-secondary);">' + esc(ms.comment) + '</td>';
+                                    html += '</tr>';
+                                });
+                            }
+                            html += '</tbody></table>';
+                        } else {
+                            html += '<span style="color:var(--text-muted); font-size:11px;">未评分</span>';
+                        }
+                        html += '</div>';
+                    });
+                }
+
+                if (votes.length > 0) {
+                    html += '<h4 style="font-size:13px; font-weight:600; color:var(--text-primary); margin:0 0 8px 0;">投票记录 (' + votes.length + ')</h4>';
+                    html += '<table class="w-full text-sm border-collapse">';
+                    html += '<thead><tr style="border:1px solid var(--border-default); padding:2px 6px; text-align:center;" style="background:var(--bg-elevated); color:var(--accent); font-size:10px;"><th class="border px-2 py-1 text-left">用例</th><th style="border:1px solid var(--border-default); padding:2px 6px; text-align:center;">模型</th><th style="border:1px solid var(--border-default); padding:2px 6px; text-align:center;">结果</th><th style="border:1px solid var(--border-default); padding:2px 6px; text-align:center;">时间</th></tr></thead><tbody>';
+                    votes.forEach(function(v) {
+                        var modelLabels = (v.models || []).map(function(mid) {
+                            var m = MODELS.find(function(m) { return m.id === mid; });
+                            return esc(m ? getModelDisplayName(m.id, m.name) : mid);
+                        }).join(' vs ');
+                        var winnerLabel = '平局';
+                        if (v.vote !== 'tie' && v.winner) {
+                            var wm = MODELS.find(function(m) { return m.id === v.winner; });
+                            var wCustom = !wm ? getCustomModelConfig(v.winner) : null;
+                            winnerLabel = esc(wm ? getModelDisplayName(wm.id, wm.name) : (wCustom ? wCustom.display_name : v.winner)) + ' 胜';
+                        }
+                        html += '<tr><td style="border:1px solid var(--border-default); padding:2px 6px; text-align:center;">' + esc(v.prompt_name || v.prompt_id) + '</td>';
+                        html += '<td class="border px-2 py-1 text-center">' + (modelLabels || '-') + '</td>';
+                        html += '<td class="border px-2 py-1 text-center">' + winnerLabel + '</td>';
+                        html += '<td style="border:1px solid var(--border-default); padding:2px 6px; font-size:11px; color:var(--text-muted);">' + esc((v.timestamp || '').slice(0, 16)) + '</td></tr>';
+                    });
+                    html += '</tbody></table>';
+                }
+
+                content.textContent = '';
+                content.innerHTML = html;
+            } catch (e) {
+                content.textContent = '加载失败: ' + e.message;
+            }
+        }
+
+        function closeHistory() {
+            document.getElementById('history-modal').classList.remove('show');
+        }
+
+        async function clearHistory() {
+            if (!confirm('确定清空所有历史记录?')) return;
+            await BenchmarkStore.clear('results');
+            await BenchmarkStore.clear('votes');
+            await BenchmarkStore.clear('generations');
+            closeHistory();
+            setStatus('历史记录已清空');
+        }
+
+        // ===== 统计面板 =====
+        async function showStats() {
+            document.getElementById('stats-modal').classList.add('show');
+            var content = document.getElementById('stats-content');
+            content.textContent = '加载中...';
+
+            try {
+                var generations = await BenchmarkStore.getAll('generations');
+
+                if (generations.length === 0) {
+                    content.textContent = '暂无生成记录';
+                    return;
+                }
+
+                var stats = {};
+                generations.forEach(function(g) {
+                    var mid = g.model_id || 'unknown';
+                    if (!stats[mid]) {
+                        stats[mid] = {
+                            model_name: getModelDisplayName(mid, g.model_name || mid),
+                            count: 0,
+                            totalLatency: 0,
+                            totalInputTokens: 0,
+                            totalOutputTokens: 0,
+                            totalTokens: 0,
+                        };
+                    }
+                    stats[mid].count++;
+                    stats[mid].totalLatency += g.elapsed_seconds || 0;
+                    stats[mid].totalInputTokens += g.input_tokens || 0;
+                    stats[mid].totalOutputTokens += g.output_tokens || 0;
+                    stats[mid].totalTokens += g.total_tokens || 0;
+                });
+
+                var modelIds = Object.keys(stats).sort();
+
+                var html = '<table class="w-full text-sm border-collapse">';
+                html += '<thead><tr style="border:1px solid var(--border-default); padding:2px 6px; text-align:center;" style="background:var(--bg-elevated); color:var(--accent); font-size:10px;">';
+                html += '<th class="border px-3 py-2 text-left">模型</th>';
+                html += '<th class="border px-3 py-2 text-right">生成次数</th>';
+                html += '<th class="border px-3 py-2 text-right">平均耗时</th>';
+                html += '<th class="border px-3 py-2 text-right">总 Input Tokens</th>';
+                html += '<th class="border px-3 py-2 text-right">总 Output Tokens</th>';
+                html += '<th class="border px-3 py-2 text-right">总 Tokens</th>';
+                html += '</tr></thead><tbody>';
+
+                var grandTotal = { count: 0, latency: 0, input: 0, output: 0, total: 0 };
+
+                modelIds.forEach(function(mid) {
+                    var s = stats[mid];
+                    var avgLatency = s.count > 0 ? (s.totalLatency / s.count).toFixed(1) : '0';
+                    html += '<tr>';
+                    html += '<td class="border px-3 py-2 font-medium">' + esc(s.model_name) + '</td>';
+                    html += '<td class="border px-3 py-2 text-right">' + s.count + '</td>';
+                    html += '<td class="border px-3 py-2 text-right">' + avgLatency + 's</td>';
+                    html += '<td class="border px-3 py-2 text-right">' + s.totalInputTokens.toLocaleString() + '</td>';
+                    html += '<td class="border px-3 py-2 text-right">' + s.totalOutputTokens.toLocaleString() + '</td>';
+                    html += '<td class="border px-3 py-2 text-right font-semibold">' + s.totalTokens.toLocaleString() + '</td>';
+                    html += '</tr>';
+                    grandTotal.count += s.count;
+                    grandTotal.latency += s.totalLatency;
+                    grandTotal.input += s.totalInputTokens;
+                    grandTotal.output += s.totalOutputTokens;
+                    grandTotal.total += s.totalTokens;
+                });
+
+                html += '<tr style="background:var(--bg-surface);">';
+                html += '<td class="border px-3 py-2">平均</td>';
+                html += '<td class="border px-3 py-2 text-right">' + grandTotal.count + '</td>';
+                var avgGrandLatency = grandTotal.count > 0 ? (grandTotal.latency / grandTotal.count).toFixed(1) : '0';
+                html += '<td class="border px-3 py-2 text-right">' + avgGrandLatency + 's</td>';
+                html += '<td class="border px-3 py-2 text-right">' + grandTotal.input.toLocaleString() + '</td>';
+                html += '<td class="border px-3 py-2 text-right">' + grandTotal.output.toLocaleString() + '</td>';
+                html += '<td class="border px-3 py-2 text-right">' + grandTotal.total.toLocaleString() + '</td>';
+                html += '</tr>';
+
+                html += '</tbody></table>';
+
+                // Check-pass summary across all results
+                var results = await BenchmarkStore.getAll('results');
+                var checkStats = {};
+                results.forEach(function(r) {
+                    var scores = r.model_scores || [];
+                    scores.forEach(function(ms) {
+                        if (!checkStats[ms.model_id]) {
+                            checkStats[ms.model_id] = { model_name: ms.model_name, total_pass: 0, total_partial: 0, total_fail: 0, total_checks: 0, count: 0 };
+                        }
+                        checkStats[ms.model_id].total_pass += ms.pass_count || 0;
+                        checkStats[ms.model_id].total_partial += ms.partial_count || 0;
+                        checkStats[ms.model_id].total_fail += ms.fail_count || 0;
+                        checkStats[ms.model_id].total_checks += (ms.pass_count || 0) + (ms.partial_count || 0) + (ms.fail_count || 0);
+                        checkStats[ms.model_id].count++;
+                    });
+                });
+
+                var statKeys = Object.keys(checkStats);
+                if (statKeys.length > 0) {
+                    html += '<h4 style="font-size:13px; font-weight:600; color:var(--text-primary); margin:16px 0 8px 0;">检查点通过率汇总</h4>';
+                    html += '<table class="w-full text-sm border-collapse">';
+                    html += '<thead><tr style="border:1px solid var(--border-default); padding:2px 6px; text-align:center;" style="background:var(--bg-elevated); color:var(--accent); font-size:10px;"><th class="border px-3 py-2 text-left">模型</th><th class="border px-3 py-2 text-right">评分次数</th><th class="border px-3 py-2 text-right">通过</th><th class="border px-3 py-2 text-right">部分</th><th class="border px-3 py-2 text-right">失败</th><th class="border px-3 py-2 text-right">通过率</th></tr></thead><tbody>';
+                    statKeys.forEach(function(mid) {
+                        var cs = checkStats[mid];
+                        var rate = cs.total_checks > 0 ? ((cs.total_pass + cs.total_partial * 0.5) / cs.total_checks * 100).toFixed(1) : '0';
+                        html += '<tr><td class="border px-3 py-2 font-medium">' + esc(cs.model_name) + '</td>';
+                        html += '<td class="border px-3 py-2 text-right">' + cs.count + '</td>';
+                        html += '<td class="border px-3 py-2 text-right" style="color:#22c55e">' + cs.total_pass + '</td>';
+                        html += '<td class="border px-3 py-2 text-right" style="color:#eab308">' + cs.total_partial + '</td>';
+                        html += '<td class="border px-3 py-2 text-right" style="color:#ef4444">' + cs.total_fail + '</td>';
+                        html += '<td class="border px-3 py-2 text-right font-semibold">' + rate + '%</td></tr>';
+                    });
+                    html += '</tbody></table>';
+                }
+
+                html += '<p style="font-size:11px; color:var(--text-muted); margin-top:12px;">共 ' + generations.length + ' 次生成</p>';
+
+                content.textContent = '';
+                content.innerHTML = html;
+            } catch (e) {
+                content.textContent = '加载失败: ' + e.message;
+            }
+        }
+
+        function closeStats() {
+            document.getElementById('stats-modal').classList.remove('show');
+        }
+
+        // ===== 初始化 =====
+        window.onload = async function() {
+            await loadData();
+            loadApiConfig();
+            rebuildPanes();
+            renderList();
+            await restoreSession();
+            if (!activeSession) {
+                setStatus('就绪 | 模型: ' + MODELS.map(function(m) { return getModelDisplayName(m.id, m.name); }).join(', '));
+            }
+        };
+    </script>
+</body>
+</html>
