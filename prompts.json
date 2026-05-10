@@ -1,9 +1,11 @@
 {
   "models": [
-    { "id": "deepseek-v4-flash", "name": "DeepSeek-V4-Flash", "provider": "deepseek" },
     { "id": "claude-opus-4-7", "name": "Claude Opus 4.7", "provider": "claude" },
     { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "provider": "claude" },
-    { "id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5", "provider": "claude" }
+    { "id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5", "provider": "claude" },
+    { "id": "minimax-m2.5-free", "name": "MiniMax M2.5 Free", "provider": "opencode" },
+    { "id": "hy3-preview-free", "name": "Hy3 Preview Free", "provider": "opencode" },
+    { "id": "nemotron-3-super-free", "name": "Nemotron 3 Super Free", "provider": "opencode" }
   ],
   "prompts": [
     {

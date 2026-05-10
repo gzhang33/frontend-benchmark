@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benchmark UI Redesign — Design Spec</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-0: #09090b;
+            --bg-1: #0f0f12;
+            --bg-2: #16161a;
+            --bg-3: #1c1c22;
+            --bg-4: #24242c;
+            --border-1: rgba(255,255,255,0.06);
+            --border-2: rgba(255,255,255,0.10);
+            --border-3: rgba(255,255,255,0.16);
+            --text-1: #fafafa;
+            --text-2: #a1a1aa;
+            --text-3: #52525b;
+            --accent: #22d3ee;
+            --accent-dim: rgba(34,211,238,0.12);
+            --accent-glow: rgba(34,211,238,0.25);
+            --green: #34d399;
+            --green-dim: rgba(52,211,153,0.12);
+            --amber: #fbbf24;
+            --amber-dim: rgba(251,191,36,0.12);
+            --red: #f87171;
+            --red-dim: rgba(248,113,113,0.12);
+            --purple: #a78bfa;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Geist', system-ui, sans-serif;
+            background: var(--bg-0);
+            color: var(--text-1);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===== NAV ===== */
+        .spec-nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(9,9,11,0.85); backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-1);
+            padding: 0 32px; height: 48px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .spec-nav h1 {
+            font-family: 'Geist Mono', monospace;
+            font-size: 12px; font-weight: 500;
+            color: var(--text-3); letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .spec-nav h1 span { color: var(--accent); }
+        .nav-tabs { display: flex; gap: 2px; }
+        .nav-tab {
+            padding: 6px 14px; border-radius: 6px;
+            font-size: 13px; font-weight: 400; color: var(--text-3);
+            cursor: pointer; border: none; background: none;
+            transition: all 0.2s;
+        }
+        .nav-tab:hover { color: var(--text-2); background: var(--bg-2); }
+        .nav-tab.active { color: var(--text-1); background: var(--bg-3); font-weight: 500; }
+
+        /* ===== SECTIONS ===== */
+        .spec-section {
+            display: none; min-height: 100vh; padding: 72px 32px 64px;
+            max-width: 1400px; margin: 0 auto;
+        }
+        .spec-section.active { display: block; }
+        .section-label {
+            font-family: 'Geist Mono', monospace;
+            font-size: 11px; font-weight: 500;
+            color: var(--accent); letter-spacing: 2px;
+            text-transform: uppercase; margin-bottom: 12px;
+        }
+        .section-title {
+            font-family: 'Instrument Serif', serif;
+            font-size: 42px; font-weight: 400;
+            color: var(--text-1); line-height: 1.15;
+            margin-bottom: 8px;
+        }
+        .section-desc {
+            font-size: 15px; color: var(--text-2);
+            line-height: 1.7; max-width: 640px;
+            margin-bottom: 40px;
+        }
+
+        /* ===== COLOR SWATCHES ===== */
+        .swatch-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px; margin-bottom: 48px;
+        }
+        .swatch {
+            border-radius: 10px; overflow: hidden;
+            border: 1px solid var(--border-1);
+            background: var(--bg-2);
+        }
+        .swatch-color { height: 64px; }
+        .swatch-info { padding: 10px 12px; }
+        .swatch-name { font-size: 12px; font-weight: 500; color: var(--text-1); }
+        .swatch-val { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--text-3); margin-top: 2px; }
+
+        /* ===== MOCKUP FRAME ===== */
+        .mockup-frame {
+            border: 1px solid var(--border-2);
+            border-radius: 12px; overflow: hidden;
+            background: var(--bg-1);
+            box-shadow: 0 8px 40px rgba(0,0,0,0.4), 0 0 0 1px var(--border-1);
+            margin-bottom: 32px;
+        }
+        .mockup-titlebar {
+            height: 36px; background: var(--bg-2);
+            border-bottom: 1px solid var(--border-1);
+            display: flex; align-items: center; padding: 0 14px; gap: 6px;
+        }
+        .mockup-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--bg-4); }
+        .mockup-dot.r { background: #ef4444; }
+        .mockup-dot.y { background: #eab308; }
+        .mockup-dot.g { background: #22c55e; }
+        .mockup-url {
+            margin-left: 12px; font-size: 11px; color: var(--text-3);
+            font-family: 'Geist Mono', monospace;
+        }
+
+        /* ===== MAIN LAYOUT MOCKUP ===== */
+        .app-layout {
+            display: grid;
+            grid-template-rows: 48px 1fr 28px;
+            height: 560px;
+        }
+        .app-header {
+            background: var(--bg-2);
+            border-bottom: 1px solid var(--border-1);
+            display: flex; align-items: center;
+            padding: 0 16px; gap: 12px;
+        }
+        .app-logo {
+            font-family: 'Instrument Serif', serif;
+            font-size: 18px; color: var(--text-1);
+        }
+        .app-logo span { color: var(--accent); }
+        .header-spacer { flex: 1; }
+        .header-btn {
+            padding: 5px 12px; border-radius: 6px;
+            font-size: 12px; font-weight: 500;
+            border: 1px solid var(--border-2); background: transparent;
+            color: var(--text-2); cursor: pointer;
+            transition: all 0.15s;
+        }
+        .header-btn:hover { background: var(--bg-3); color: var(--text-1); }
+        .header-btn.primary {
+            background: var(--accent); color: var(--bg-0);
+            border-color: var(--accent); font-weight: 600;
+        }
+        .header-btn.primary:hover { opacity: 0.9; }
+
+        /* Tabs bar */
+        .app-tabs {
+            display: flex; gap: 0;
+            border-bottom: 1px solid var(--border-1);
+            background: var(--bg-1);
+            padding: 0 16px;
+        }
+        .app-tab {
+            padding: 10px 16px; font-size: 13px;
+            color: var(--text-3); border: none;
+            background: none; cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.15s; font-weight: 400;
+        }
+        .app-tab:hover { color: var(--text-2); }
+        .app-tab.active { color: var(--text-1); border-bottom-color: var(--accent); font-weight: 500; }
+
+        /* Main area */
+        .app-main {
+            display: flex; overflow: hidden;
+        }
+
+        /* Test case sidebar */
+        .tc-sidebar {
+            width: 240px; flex-shrink: 0;
+            border-right: 1px solid var(--border-1);
+            display: flex; flex-direction: column;
+            background: var(--bg-1);
+        }
+        .tc-sidebar-header {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-1);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .tc-sidebar-title {
+            font-size: 11px; font-weight: 600;
+            color: var(--text-3); text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .tc-count {
+            font-family: 'Geist Mono', monospace;
+            font-size: 11px; color: var(--text-3);
+            background: var(--bg-3); padding: 2px 7px;
+            border-radius: 4px;
+        }
+        .tc-list { flex: 1; overflow-y: auto; padding: 4px; }
+        .tc-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 10px; border-radius: 6px;
+            cursor: pointer; transition: all 0.15s;
+            margin-bottom: 2px;
+        }
+        .tc-item:hover { background: var(--bg-2); }
+        .tc-item.active { background: var(--accent-dim); }
+        .tc-check {
+            width: 14px; height: 14px; border-radius: 3px;
+            border: 1.5px solid var(--border-2); flex-shrink: 0;
+        }
+        .tc-item.active .tc-check { border-color: var(--accent); background: var(--accent-dim); }
+        .tc-info { flex: 1; min-width: 0; }
+        .tc-name { font-size: 13px; font-weight: 500; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tc-dim { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+        .tc-id {
+            font-family: 'Geist Mono', monospace;
+            font-size: 10px; color: var(--text-3);
+            background: var(--bg-3); padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        /* Batch controls */
+        .tc-batch {
+            padding: 8px 10px;
+            border-top: 1px solid var(--border-1);
+        }
+        .batch-btn {
+            width: 100%; padding: 7px; border-radius: 6px;
+            font-size: 12px; font-weight: 500;
+            border: 1px solid var(--accent);
+            background: var(--accent-dim); color: var(--accent);
+            cursor: pointer; transition: all 0.15s;
+        }
+        .batch-btn:hover { background: var(--accent); color: var(--bg-0); }
+
+        /* Compare area */
+        .compare-area {
+            flex: 1; display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        .compare-toolbar {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-1);
+            background: var(--bg-1);
+        }
+        .toolbar-label {
+            font-size: 11px; color: var(--text-3);
+            font-family: 'Geist Mono', monospace;
+        }
+        .toolbar-select {
+            padding: 4px 8px; border-radius: 4px;
+            border: 1px solid var(--border-2); background: var(--bg-2);
+            color: var(--text-1); font-size: 12px;
+        }
+        .toolbar-divider { width: 1px; height: 20px; background: var(--border-2); }
+        .gen-btn {
+            padding: 5px 14px; border-radius: 6px;
+            font-size: 12px; font-weight: 600;
+            border: none; background: var(--accent);
+            color: var(--bg-0); cursor: pointer;
+        }
+        .gen-btn:hover { opacity: 0.9; }
+
+        /* Split panes */
+        .split-panes { flex: 1; display: flex; overflow: hidden; }
+        .pane {
+            flex: 1; display: flex; flex-direction: column;
+            border-right: 1px solid var(--border-1);
+        }
+        .pane:last-child { border-right: none; }
+        .pane-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 6px 12px;
+            border-bottom: 1px solid var(--border-1);
+            background: var(--bg-2);
+        }
+        .pane-model-name { font-size: 12px; font-weight: 500; color: var(--text-2); }
+        .pane-tabs { display: flex; gap: 2px; }
+        .pane-tab {
+            padding: 3px 8px; border-radius: 4px;
+            font-size: 11px; color: var(--text-3);
+            border: none; background: none; cursor: pointer;
+        }
+        .pane-tab.active { background: var(--bg-3); color: var(--text-1); }
+        .pane-body {
+            flex: 1; display: flex; align-items: center;
+            justify-content: center;
+            background: var(--bg-0);
+            color: var(--text-3); font-size: 13px;
+        }
+        .pane-body.generating {
+            background: linear-gradient(135deg, var(--bg-0) 0%, var(--bg-2) 100%);
+        }
+        .gen-indicator {
+            display: flex; flex-direction: column;
+            align-items: center; gap: 8px;
+        }
+        .gen-spinner {
+            width: 24px; height: 24px;
+            border: 2px solid var(--border-2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .gen-text { font-size: 12px; color: var(--text-3); font-family: 'Geist Mono', monospace; }
+
+        .pane-body.done {
+            background: linear-gradient(135deg, rgba(34,211,238,0.03) 0%, var(--bg-0) 100%);
+        }
+        .done-check {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: var(--green-dim); display: flex;
+            align-items: center; justify-content: center;
+            font-size: 20px; margin-bottom: 8px;
+        }
+        .done-label { font-size: 12px; color: var(--green); font-weight: 500; }
+        .done-meta { font-size: 11px; color: var(--text-3); margin-top: 4px; font-family: 'Geist Mono', monospace; }
+
+        /* Right panel (score) */
+        .score-panel {
+            width: 300px; flex-shrink: 0;
+            border-left: 1px solid var(--border-1);
+            display: flex; flex-direction: column;
+            background: var(--bg-1);
+            overflow-y: auto;
+        }
+        .score-panel-header {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border-1);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .score-panel-title {
+            font-size: 12px; font-weight: 600; color: var(--text-1);
+        }
+        .score-panel-close {
+            width: 24px; height: 24px; border-radius: 4px;
+            border: none; background: none;
+            color: var(--text-3); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+        }
+        .score-panel-close:hover { background: var(--bg-3); color: var(--text-1); }
+        .score-section { padding: 12px 14px; }
+        .score-section-title {
+            font-size: 10px; font-weight: 600; color: var(--text-3);
+            text-transform: uppercase; letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+        .score-check-row {
+            display: flex; align-items: center; gap: 8px;
+            margin-bottom: 6px;
+        }
+        .score-check-label { font-size: 12px; color: var(--text-2); flex: 1; }
+        .score-check-btns { display: flex; gap: 2px; }
+        .sc-btn {
+            padding: 3px 8px; border-radius: 4px;
+            font-size: 10px; font-weight: 500;
+            border: 1px solid var(--border-2); background: transparent;
+            color: var(--text-3); cursor: pointer; transition: all 0.15s;
+        }
+        .sc-btn:hover { background: var(--bg-3); }
+        .sc-btn.pass { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+        .sc-btn.partial { background: var(--amber-dim); border-color: var(--amber); color: var(--amber); }
+        .sc-btn.fail { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+
+        .score-model-divider {
+            display: flex; align-items: center; gap: 8px;
+            margin: 12px 0 8px;
+        }
+        .score-model-divider span {
+            font-size: 11px; font-weight: 600; color: var(--accent);
+            font-family: 'Geist Mono', monospace;
+        }
+        .score-model-divider::after {
+            content: ''; flex: 1; height: 1px; background: var(--border-1);
+        }
+
+        .save-score-btn {
+            width: 100%; padding: 8px; border-radius: 6px;
+            font-size: 12px; font-weight: 600;
+            border: none; background: var(--accent);
+            color: var(--bg-0); cursor: pointer;
+            margin-top: 12px; transition: all 0.15s;
+        }
+        .save-score-btn:hover { opacity: 0.9; }
+
+        /* Status bar */
+        .app-statusbar {
+            height: 28px; background: var(--bg-2);
+            border-top: 1px solid var(--border-1);
+            display: flex; align-items: center;
+            padding: 0 14px; gap: 16px;
+        }
+        .status-item {
+            font-family: 'Geist Mono', monospace;
+            font-size: 11px; color: var(--text-3);
+            display: flex; align-items: center; gap: 5px;
+        }
+        .status-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--green);
+        }
+        .status-dot.idle { background: var(--text-3); }
+
+        /* ===== FLOW DIAGRAM ===== */
+        .flow-container {
+            display: flex; flex-direction: column;
+            gap: 16px; align-items: center;
+            padding: 40px 0;
+        }
+        .flow-step {
+            display: flex; align-items: center; gap: 16px;
+            padding: 16px 24px; border-radius: 10px;
+            border: 1px solid var(--border-2);
+            background: var(--bg-2);
+            max-width: 500px; width: 100%;
+        }
+        .flow-num {
+            width: 32px; height: 32px; border-radius: 8px;
+            background: var(--accent-dim); color: var(--accent);
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Geist Mono', monospace;
+            font-size: 13px; font-weight: 600; flex-shrink: 0;
+        }
+        .flow-content { flex: 1; }
+        .flow-title { font-size: 14px; font-weight: 500; color: var(--text-1); }
+        .flow-desc { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+        .flow-arrow {
+            font-size: 18px; color: var(--text-3);
+        }
+
+        /* ===== COMPARISON TABLE ===== */
+        .compare-table {
+            width: 100%; border-collapse: collapse; font-size: 13px;
+        }
+        .compare-table th, .compare-table td {
+            padding: 10px 16px; text-align: left;
+            border-bottom: 1px solid var(--border-1);
+        }
+        .compare-table th {
+            font-size: 11px; font-weight: 600;
+            color: var(--text-3); text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .compare-table td { color: var(--text-2); }
+        .badge {
+            display: inline-block; padding: 2px 8px;
+            border-radius: 4px; font-size: 11px; font-weight: 500;
+        }
+        .badge-accent { background: var(--accent-dim); color: var(--accent); }
+        .badge-green { background: var(--green-dim); color: var(--green); }
+        .badge-amber { background: var(--amber-dim); color: var(--amber); }
+        .badge-red { background: var(--red-dim); color: var(--red); }
+
+        /* ===== TYPOGRAPHY ===== */
+        .type-specimen {
+            display: grid; gap: 32px; margin-bottom: 48px;
+        }
+        .type-row {
+            display: flex; align-items: baseline; gap: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-1);
+        }
+        .type-label {
+            width: 160px; flex-shrink: 0;
+            font-size: 11px; color: var(--text-3);
+            font-family: 'Geist Mono', monospace;
+        }
+        .type-sample { color: var(--text-1); }
+
+        /* Animations */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up { animation: fadeUp 0.5s ease-out both; }
+        .fade-up-1 { animation-delay: 0.1s; }
+        .fade-up-2 { animation-delay: 0.2s; }
+        .fade-up-3 { animation-delay: 0.3s; }
+        .fade-up-4 { animation-delay: 0.4s; }
+
+        /* Grid helpers */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+        @media (max-width: 900px) {
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            padding: 20px; border-radius: 10px;
+            border: 1px solid var(--border-2);
+            background: var(--bg-2);
+        }
+        .card h4 { font-size: 13px; font-weight: 600; color: var(--text-1); margin-bottom: 8px; }
+        .card p { font-size: 13px; color: var(--text-2); line-height: 1.6; }
+
+        .highlight-box {
+            padding: 16px 20px; border-radius: 8px;
+            border-left: 3px solid var(--accent);
+            background: var(--accent-dim);
+            margin-bottom: 24px;
+        }
+        .highlight-box p { font-size: 13px; color: var(--text-2); line-height: 1.6; }
+        .highlight-box strong { color: var(--accent); }
+    </style>
+</head>
+<body>
+
+<nav class="spec-nav">
+    <h1><span>//</span> design-spec</h1>
+    <div class="nav-tabs">
+        <button class="nav-tab active" onclick="showSection('overview')">Overview</button>
+        <button class="nav-tab" onclick="showSection('layout')">Layout</button>
+        <button class="nav-tab" onclick="showSection('components')">Components</button>
+        <button class="nav-tab" onclick="showSection('flow')">User Flow</button>
+        <button class="nav-tab" onclick="showSection('tokens')">Design Tokens</button>
+    </div>
+</nav>
+
+<!-- ==================== OVERVIEW ==================== -->
+<section class="spec-section active" id="sec-overview">
+    <div class="section-label fade-up">Benchmark UI Redesign</div>
+    <h1 class="section-title fade-up fade-up-1">重新思考<br>模型评测体验</h1>
+    <p class="section-desc fade-up fade-up-2">
+        将当前三栏拥挤布局重构为 Figma 风格的工作台。对比区域最大化，评分面板从右侧抽屉按需唤出，批量操作流程化，视觉品质全面升级。
+    </p>
+
+    <div class="grid-2 fade-up fade-up-3" style="margin-bottom: 40px;">
+        <div class="card">
+            <h4>核心原则</h4>
+            <p>对比优先 — 主区域 100% 用于模型输出对比，所有辅助功能（评分、详情、配置）通过抽屉/弹出层按需访问，不占用常驻空间。</p>
+        </div>
+        <div class="card">
+            <h4>操作流简化</h4>
+            <p>新建会话 → 选模型 → 选用例 → 一键生成 → 评分 → 下一个。消除当前需要手动切换多个面板的痛点。</p>
+        </div>
+    </div>
+
+    <div class="grid-3 fade-up fade-up-4">
+        <div class="card" style="border-color: var(--accent); border-width: 1px;">
+            <h4 style="color: var(--accent);">01 对比区最大化</h4>
+            <p>移除常驻 info-panel，评分通过右侧可折叠抽屉访问。对比区从 ~40% 提升到 ~75% 可视面积。</p>
+        </div>
+        <div class="card" style="border-color: var(--green); border-width: 1px;">
+            <h4 style="color: var(--green);">02 批量流程化</h4>
+            <p>勾选用例 → 一键批量运行 → 逐个评分 → 自动跳转下一个。进度清晰，不再需要手动切换。</p>
+        </div>
+        <div class="card" style="border-color: var(--amber); border-width: 1px;">
+            <h4 style="color: var(--amber);">03 视觉升级</h4>
+            <p>精致暗色调，更好的层次感，微交互动效，专业数据可视化。告别平庸的深蓝配色。</p>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== LAYOUT ==================== -->
+<section class="spec-section" id="sec-layout">
+    <div class="section-label">Layout Architecture</div>
+    <h1 class="section-title">工作台布局</h1>
+    <p class="section-desc">
+        上方标签页导航切换核心视图，左侧可折叠测试用例列表，主区域全宽对比，右侧评分抽屉按需唤出。
+    </p>
+
+    <div class="mockup-frame">
+        <div class="mockup-titlebar">
+            <div class="mockup-dot r"></div>
+            <div class="mockup-dot y"></div>
+            <div class="mockup-dot g"></div>
+            <span class="mockup-url">localhost:3456</span>
+        </div>
+        <div class="app-layout">
+            <!-- Header -->
+            <div class="app-header">
+                <div class="app-logo">Bench<span>.</span></div>
+                <div class="app-tabs">
+                    <button class="app-tab active">对比</button>
+                    <button class="app-tab">统计</button>
+                    <button class="app-tab">历史</button>
+                </div>
+                <div class="header-spacer"></div>
+                <button class="header-btn" style="font-size: 11px;">盲评</button>
+                <button class="header-btn" style="font-size: 11px;">配置</button>
+                <button class="header-btn primary" style="font-size: 11px;">新建会话</button>
+            </div>
+
+            <!-- Main area -->
+            <div class="app-main">
+                <!-- Test case sidebar -->
+                <div class="tc-sidebar">
+                    <div class="tc-sidebar-header">
+                        <span class="tc-sidebar-title">用例</span>
+                        <span class="tc-count">9</span>
+                    </div>
+                    <div class="tc-list">
+                        <div class="tc-item active">
+                            <div class="tc-check"></div>
+                            <div class="tc-info">
+                                <div class="tc-name">环形进度条</div>
+                                <div class="tc-dim">简单任务</div>
+                            </div>
+                            <span class="tc-id">S1</span>
+                        </div>
+                        <div class="tc-item">
+                            <div class="tc-check"></div>
+                            <div class="tc-info">
+                                <div class="tc-name">石头剪刀布</div>
+                                <div class="tc-dim">简单任务</div>
+                            </div>
+                            <span class="tc-id">S2</span>
+                        </div>
+                        <div class="tc-item">
+                            <div class="tc-check"></div>
+                            <div class="tc-info">
+                                <div class="tc-name">跨文件生成-初始</div>
+                                <div class="tc-dim">复杂任务</div>
+                            </div>
+                            <span class="tc-id">C1-1</span>
+                        </div>
+                        <div class="tc-item">
+                            <div class="tc-check"></div>
+                            <div class="tc-info">
+                                <div class="tc-name">跨文件生成-补导入</div>
+                                <div class="tc-dim">复杂任务</div>
+                            </div>
+                            <span class="tc-id">C1-2</span>
+                        </div>
+                        <div class="tc-item">
+                            <div class="tc-check"></div>
+                            <div class="tc-info">
+                                <div class="tc-name">太空餐厅点餐模拟器</div>
+                                <div class="tc-dim">复杂任务</div>
+                            </div>
+                            <span class="tc-id">C2</span>
+                        </div>
+                        <div class="tc-item">
+                            <div class="tc-check"></div>
+                            <div class="tc-info">
+                                <div class="tc-name">记忆卡牌</div>
+                                <div class="tc-dim">响应速度</div>
+                            </div>
+                            <span class="tc-id">P1</span>
+                        </div>
+                    </div>
+                    <div class="tc-batch">
+                        <button class="batch-btn">批量运行 (3)</button>
+                    </div>
+                </div>
+
+                <!-- Compare area -->
+                <div class="compare-area">
+                    <div class="compare-toolbar">
+                        <span class="toolbar-label">SPLIT</span>
+                        <select class="toolbar-select"><option>2</option><option>3</option><option>4</option></select>
+                        <div class="toolbar-divider"></div>
+                        <button class="gen-btn">全部生成</button>
+                        <div class="header-spacer"></div>
+                        <button class="header-btn" style="font-size: 11px;">评分面板</button>
+                    </div>
+                    <div class="split-panes">
+                        <div class="pane">
+                            <div class="pane-head">
+                                <span class="pane-model-name">GLM-5-Turbo</span>
+                                <div class="pane-tabs">
+                                    <button class="pane-tab active">预览</button>
+                                    <button class="pane-tab">源码</button>
+                                </div>
+                            </div>
+                            <div class="pane-body done">
+                                <div class="gen-indicator">
+                                    <div class="done-check">&#10003;</div>
+                                    <div class="done-label">生成完成</div>
+                                    <div class="done-meta">12.3s &middot; 2,847 tok/s</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pane">
+                            <div class="pane-head">
+                                <span class="pane-model-name">DeepSeek-V4-Flash</span>
+                                <div class="pane-tabs">
+                                    <button class="pane-tab active">预览</button>
+                                    <button class="pane-tab">源码</button>
+                                </div>
+                            </div>
+                            <div class="pane-body generating">
+                                <div class="gen-indicator">
+                                    <div class="gen-spinner"></div>
+                                    <div class="gen-text">生成中... 1,204 字符</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status bar -->
+            <div class="app-statusbar">
+                <div class="status-item">
+                    <div class="status-dot"></div>
+                    就绪
+                </div>
+                <div class="status-item">模型: GLM-5-Turbo, DeepSeek-V4-Flash</div>
+                <div class="status-item" style="margin-left: auto;">v3.0</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid-2" style="margin-top: 32px;">
+        <div class="highlight-box">
+            <p><strong>布局变化:</strong> 移除常驻 info-panel (320px)，对比区宽度提升约 40%。评分改为右侧可收起抽屉，按需唤出不占空间。</p>
+        </div>
+        <div class="highlight-box" style="border-left-color: var(--green); background: var(--green-dim);">
+            <p><strong>导航简化:</strong> 统计、历史、配置从 header 按钮弹 modal → 改为顶部标签页直接切换，减少 2 次点击。</p>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== COMPONENTS ==================== -->
+<section class="spec-section" id="sec-components">
+    <div class="section-label">Component Design</div>
+    <h1 class="section-title">关键组件</h1>
+    <p class="section-desc">
+        评分面板、统计视图、批量进度、盲评投票 — 每个组件都围绕核心工作流重新设计。
+    </p>
+
+    <div class="grid-2" style="margin-bottom: 32px;">
+        <!-- Score Panel -->
+        <div>
+            <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-2);">评分抽屉</h3>
+            <div class="mockup-frame">
+                <div class="mockup-titlebar">
+                    <div class="mockup-dot r"></div><div class="mockup-dot y"></div><div class="mockup-dot g"></div>
+                </div>
+                <div style="background: var(--bg-1); padding: 0; height: 340px; display: flex; flex-direction: column;">
+                    <div class="score-panel-header">
+                        <span class="score-panel-title">检查点评分</span>
+                        <button class="score-panel-close">&times;</button>
+                    </div>
+                    <div class="score-section">
+                        <div class="score-model-divider"><span>GLM-5-Turbo</span></div>
+                        <div class="score-check-row">
+                            <span class="score-check-label">0% → 100% 平滑加载</span>
+                            <div class="score-check-btns">
+                                <button class="sc-btn pass">通过</button>
+                                <button class="sc-btn">部分</button>
+                                <button class="sc-btn">失败</button>
+                            </div>
+                        </div>
+                        <div class="score-check-row">
+                            <span class="score-check-label">Done 提示</span>
+                            <div class="score-check-btns">
+                                <button class="sc-btn">通过</button>
+                                <button class="sc-btn partial">部分</button>
+                                <button class="sc-btn">失败</button>
+                            </div>
+                        </div>
+                        <div class="score-check-row">
+                            <span class="score-check-label">支持暂停</span>
+                            <div class="score-check-btns">
+                                <button class="sc-btn pass">通过</button>
+                                <button class="sc-btn">部分</button>
+                                <button class="sc-btn">失败</button>
+                            </div>
+                        </div>
+                        <div class="score-check-row">
+                            <span class="score-check-label">有可见进度反馈</span>
+                            <div class="score-check-btns">
+                                <button class="sc-btn">通过</button>
+                                <button class="sc-btn">部分</button>
+                                <button class="sc-btn fail">失败</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="score-section">
+                        <div class="score-model-divider"><span>DeepSeek-V4-Flash</span></div>
+                        <div class="score-check-row">
+                            <span class="score-check-label">0% → 100% 平滑加载</span>
+                            <div class="score-check-btns">
+                                <button class="sc-btn">通过</button>
+                                <button class="sc-btn">部分</button>
+                                <button class="sc-btn">失败</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="padding: 12px 14px; margin-top: auto;">
+                        <button class="save-score-btn">保存评分</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats View -->
+        <div>
+            <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-2);">统计视图 (标签页)</h3>
+            <div class="mockup-frame">
+                <div class="mockup-titlebar">
+                    <div class="mockup-dot r"></div><div class="mockup-dot y"></div><div class="mockup-dot g"></div>
+                </div>
+                <div style="background: var(--bg-1); padding: 20px; height: 340px; overflow-y: auto;">
+                    <table class="compare-table">
+                        <thead>
+                            <tr>
+                                <th>模型</th>
+                                <th>生成次数</th>
+                                <th>平均耗时</th>
+                                <th>通过率</th>
+                                <th>速度</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="font-weight: 500; color: var(--text-1);">GLM-5-Turbo</td>
+                                <td>12</td>
+                                <td>18.3s</td>
+                                <td><span class="badge badge-green">92%</span></td>
+                                <td>2,847 tok/s</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 500; color: var(--text-1);">DeepSeek-V4</td>
+                                <td>12</td>
+                                <td>8.7s</td>
+                                <td><span class="badge badge-accent">83%</span></td>
+                                <td>4,210 tok/s</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 500; color: var(--text-1);">GLM-5.1</td>
+                                <td>12</td>
+                                <td>24.1s</td>
+                                <td><span class="badge badge-green">96%</span></td>
+                                <td>1,890 tok/s</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 500; color: var(--text-1);">GLM-4.7</td>
+                                <td>12</td>
+                                <td>5.2s</td>
+                                <td><span class="badge badge-amber">71%</span></td>
+                                <td>6,120 tok/s</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <!-- Batch Progress -->
+        <div>
+            <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-2);">批量运行进度</h3>
+            <div class="mockup-frame">
+                <div class="mockup-titlebar">
+                    <div class="mockup-dot r"></div><div class="mockup-dot y"></div><div class="mockup-dot g"></div>
+                </div>
+                <div style="background: var(--bg-1); padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <span style="font-size: 13px; font-weight: 500; color: var(--text-1);">批量运行中</span>
+                        <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--accent);">3 / 5</span>
+                    </div>
+                    <div style="height: 6px; border-radius: 3px; background: var(--bg-3); overflow: hidden; margin-bottom: 16px;">
+                        <div style="width: 60%; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--green));"></div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 16px; height: 16px; border-radius: 50%; background: var(--green-dim); display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--green);">&#10003;</div>
+                            <span style="font-size: 12px; color: var(--text-2);">环形进度条</span>
+                            <span style="margin-left: auto; font-size: 11px; color: var(--text-3); font-family: 'Geist Mono', monospace;">12.3s</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 16px; height: 16px; border-radius: 50%; background: var(--green-dim); display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--green);">&#10003;</div>
+                            <span style="font-size: 12px; color: var(--text-2);">石头剪刀布</span>
+                            <span style="margin-left: auto; font-size: 11px; color: var(--text-3); font-family: 'Geist Mono', monospace;">9.1s</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="gen-spinner" style="width: 14px; height: 14px; border-width: 1.5px;"></div>
+                            <span style="font-size: 12px; color: var(--accent);">跨文件生成-初始</span>
+                            <span style="margin-left: auto; font-size: 11px; color: var(--text-3); font-family: 'Geist Mono', monospace;">生成中...</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border-2);"></div>
+                            <span style="font-size: 12px; color: var(--text-3);">太空餐厅点餐模拟器</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border-2);"></div>
+                            <span style="font-size: 12px; color: var(--text-3);">记忆卡牌</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Blind Vote -->
+        <div>
+            <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-2);">盲评投票</h3>
+            <div class="mockup-frame">
+                <div class="mockup-titlebar">
+                    <div class="mockup-dot r"></div><div class="mockup-dot y"></div><div class="mockup-dot g"></div>
+                </div>
+                <div style="background: var(--bg-1); padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 280px;">
+                    <p style="font-size: 13px; color: var(--text-3); margin-bottom: 16px;">哪个模型的输出更好？</p>
+                    <div style="display: flex; gap: 32px; align-items: center;">
+                        <div style="text-align: center;">
+                            <div style="width: 56px; height: 56px; border-radius: 12px; border: 2px solid var(--border-2); background: var(--bg-3); display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; cursor: pointer; transition: all 0.2s;">
+                                <span style="font-size: 13px; font-weight: 600; color: var(--text-2);">A</span>
+                            </div>
+                            <span style="font-size: 11px; color: var(--text-3);">模型 A</span>
+                        </div>
+                        <span style="font-size: 16px; color: var(--text-3); font-weight: 300;">vs</span>
+                        <div style="text-align: center;">
+                            <div style="width: 56px; height: 56px; border-radius: 12px; border: 2px solid var(--accent); background: var(--accent-dim); display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 0 20px var(--accent-glow);">
+                                <span style="font-size: 13px; font-weight: 600; color: var(--accent);">B</span>
+                            </div>
+                            <span style="font-size: 11px; color: var(--text-3);">模型 B</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-top: 20px;">
+                        <button style="padding: 6px 16px; border-radius: 6px; font-size: 12px; border: 1px solid var(--border-2); background: transparent; color: var(--text-3); cursor: pointer;">平局</button>
+                        <button style="padding: 6px 16px; border-radius: 6px; font-size: 12px; border: none; background: var(--accent); color: var(--bg-0); font-weight: 600; cursor: pointer;">确认选择</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== USER FLOW ==================== -->
+<section class="spec-section" id="sec-flow">
+    <div class="section-label">User Flow</div>
+    <h1 class="section-title">操作流程</h1>
+    <p class="section-desc">
+        从零开始到完成评测的完整路径，每一步都清晰直观。
+    </p>
+
+    <div class="flow-container">
+        <div class="flow-step">
+            <div class="flow-num">1</div>
+            <div class="flow-content">
+                <div class="flow-title">配置模型</div>
+                <div class="flow-desc">在「配置」标签页添加/管理 API 模型，或使用内置模型</div>
+            </div>
+        </div>
+        <div class="flow-arrow">&#8595;</div>
+        <div class="flow-step">
+            <div class="flow-num">2</div>
+            <div class="flow-content">
+                <div class="flow-title">新建会话</div>
+                <div class="flow-desc">选择 2-4 个模型，可选开启盲评模式，设定分屏数量</div>
+            </div>
+        </div>
+        <div class="flow-arrow">&#8595;</div>
+        <div class="flow-step">
+            <div class="flow-num">3</div>
+            <div class="flow-content">
+                <div class="flow-title">勾选用例 & 生成</div>
+                <div class="flow-desc">左侧勾选测试用例，点击「全部生成」或「批量运行」</div>
+            </div>
+        </div>
+        <div class="flow-arrow">&#8595;</div>
+        <div class="flow-step">
+            <div class="flow-num">4</div>
+            <div class="flow-content">
+                <div class="flow-title">对比 & 评分</div>
+                <div class="flow-desc">分屏预览输出，打开右侧评分抽屉打分，或盲评投票</div>
+            </div>
+        </div>
+        <div class="flow-arrow">&#8595;</div>
+        <div class="flow-step">
+            <div class="flow-num">5</div>
+            <div class="flow-content">
+                <div class="flow-title">查看统计</div>
+                <div class="flow-desc">切换到「统计」标签页，查看通过率、速度、投票汇总</div>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 48px;">
+        <h3 style="font-size: 16px; font-weight: 600; color: var(--text-1); margin-bottom: 16px;">与当前流程对比</h3>
+        <table class="compare-table">
+            <thead>
+                <tr>
+                    <th>操作</th>
+                    <th>当前</th>
+                    <th>重构后</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="color: var(--text-1); font-weight: 500;">查看统计</td>
+                    <td><span class="badge badge-red">Header 按钮 → 弹窗</span></td>
+                    <td><span class="badge badge-green">顶部标签页直接切换</span></td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-1); font-weight: 500;">查看历史</td>
+                    <td><span class="badge badge-red">Header 按钮 → 弹窗</span></td>
+                    <td><span class="badge badge-green">顶部标签页直接切换</span></td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-1); font-weight: 500;">评分</td>
+                    <td><span class="badge badge-amber">常驻右侧 320px 面板</span></td>
+                    <td><span class="badge badge-green">按需唤出的评分抽屉</span></td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-1); font-weight: 500;">批量运行</td>
+                    <td><span class="badge badge-red">无进度条，状态不清</span></td>
+                    <td><span class="badge badge-green">进度条 + 逐项状态</span></td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-1); font-weight: 500;">盲评投票</td>
+                    <td><span class="badge badge-amber">浮动按钮，容易忽略</span></td>
+                    <td><span class="badge badge-green">居中 A/B 选择卡片</span></td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-1); font-weight: 500;">对比区面积</td>
+                    <td><span class="badge badge-red">~40% 可视宽度</span></td>
+                    <td><span class="badge badge-green">~75% 可视宽度</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ==================== DESIGN TOKENS ==================== -->
+<section class="spec-section" id="sec-tokens">
+    <div class="section-label">Design System</div>
+    <h1 class="section-title">设计规范</h1>
+    <p class="section-desc">
+        精致的暗色调色板，Geist 字体系统，清晰的层次感。
+    </p>
+
+    <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 16px; color: var(--text-2);">色板</h3>
+    <div class="swatch-grid">
+        <div class="swatch">
+            <div class="swatch-color" style="background: #09090b;"></div>
+            <div class="swatch-info"><div class="swatch-name">Background 0</div><div class="swatch-val">#09090b</div></div>
+        </div>
+        <div class="swatch">
+            <div class="swatch-color" style="background: #0f0f12;"></div>
+            <div class="swatch-info"><div class="swatch-name">Background 1</div><div class="swatch-val">#0f0f12</div></div>
+        </div>
+        <div class="swatch">
+            <div class="swatch-color" style="background: #16161a;"></div>
+            <div class="swatch-info"><div class="swatch-name">Background 2</div><div class="swatch-val">#16161a</div></div>
+        </div>
+        <div class="swatch">
+            <div class="swatch-color" style="background: #1c1c22;"></div>
+            <div class="swatch-info"><div class="swatch-name">Background 3</div><div class="swatch-val">#1c1c22</div></div>
+        </div>
+        <div class="swatch">
+            <div class="swatch-color" style="background: #24242c;"></div>
+            <div class="swatch-info"><div class="swatch-name">Background 4</div><div class="swatch-val">#24242c</div></div>
+        </div>
+        <div class="swatch">
+            <div class="swatch-color" style="background: #22d3ee;"></div>
+            <div class="swatch-info"><div class="swatch-name">Accent</div><div class="swatch-val">#22d3ee</div></div>
+        </div>
+        <div class="swatch">
+            <div class="swatch-color" style="background: #34d399;"></div>
+            <div class="swatch-info"><div class="swatch-name">Green / Pass</div><div class="swatch-val">#34d399</div></div>
+        </div>
+        <div class="swatch">
+            <div class="swatch-color" style="background: #fbbf24;"></div>
+            <div class="swatch-info"><div class="swatch-name">Amber / Partial</div><div class="swatch-val">#fbbf24</div></div>
+        </div>
+        <div class="swatch">
+            <div class="swatch-color" style="background: #f87171;"></div>
+            <div class="swatch-info"><div class="swatch-name">Red / Fail</div><div class="swatch-val">#f87171</div></div>
+        </div>
+        <div class="swatch">
+            <div class="swatch-color" style="background: #a78bfa;"></div>
+            <div class="swatch-info"><div class="swatch-name">Purple</div><div class="swatch-val">#a78bfa</div></div>
+        </div>
+    </div>
+
+    <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 16px; color: var(--text-2);">字体</h3>
+    <div class="type-specimen">
+        <div class="type-row">
+            <div class="type-label">Display<br>Instrument Serif</div>
+            <div class="type-sample" style="font-family: 'Instrument Serif', serif; font-size: 36px; line-height: 1.2;">Bench.</div>
+        </div>
+        <div class="type-row">
+            <div class="type-label">Heading<br>Geist 600</div>
+            <div class="type-sample" style="font-family: 'Geist', sans-serif; font-size: 20px; font-weight: 600;">模型对比评测</div>
+        </div>
+        <div class="type-row">
+            <div class="type-label">Body<br>Geist 400</div>
+            <div class="type-sample" style="font-family: 'Geist', sans-serif; font-size: 14px;">选择测试用例后，点击「全部生成」开始模型对比评测。</div>
+        </div>
+        <div class="type-row">
+            <div class="type-label">Mono<br>Geist Mono 500</div>
+            <div class="type-sample" style="font-family: 'Geist Mono', monospace; font-size: 13px; color: var(--accent);">12.3s &middot; 2,847 tok/s</div>
+        </div>
+        <div class="type-row">
+            <div class="type-label">Caption<br>Geist Mono 400</div>
+            <div class="type-sample" style="font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--text-3);">S1 &middot; 简单任务</div>
+        </div>
+    </div>
+
+    <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 16px; color: var(--text-2);">间距 & 圆角</h3>
+    <div class="grid-3">
+        <div class="card">
+            <h4>间距系统</h4>
+            <p>基于 4px 网格: 4, 8, 12, 16, 20, 24, 32, 48px<br><br>组件内间距 12-16px，组件间间距 16-24px</p>
+        </div>
+        <div class="card">
+            <h4>圆角</h4>
+            <p>按钮: 6px<br>卡片: 10px<br>面板: 12px<br>标签: 4px<br>输入框: 6px</p>
+        </div>
+        <div class="card">
+            <h4>边框</h4>
+            <p>默认: rgba(255,255,255,0.06)<br>次级: rgba(255,255,255,0.10)<br>强调: rgba(255,255,255,0.16)<br><br>从不使用纯色边框</p>
+        </div>
+    </div>
+</section>
+
+<script>
+    function showSection(id) {
+        document.querySelectorAll('.spec-section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('sec-' + id).classList.add('active');
+        event.target.classList.add('active');
+    }
+</script>
+
+</body>
+</html>

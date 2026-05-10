@@ -9,7 +9,7 @@ const STATIC_DIR = __dirname;
 const MAX_BODY_SIZE = 10 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 60000;
 const CLAUDE_TIMEOUT_MS = 300000;
-const ALLOWED_HOSTS = ['api.deepseek.com'];
+const ALLOWED_HOSTS = ['opencode.ai'];
 
 // Extra hosts approved at runtime via custom model configs
 const dynamicAllowedHosts = new Set();
@@ -17,13 +17,6 @@ const dynamicAllowedHosts = new Set();
 const CLAUDE_MODELS = new Set([
   'claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001',
 ]);
-
-// Display name → actual CLI model alias mapping
-const CLAUDE_MODEL_ALIAS = {
-  'claude-haiku-4-5-20251001': 'glm-4.7',
-  'claude-sonnet-4-6': 'glm-5-turbo',
-  'claude-opus-4-7': 'glm-5.1',
-};
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -52,11 +45,16 @@ function loadEnv() {
 }
 
 function buildModelMap(env) {
-  const dsBase = (env.DEEPSEEK_BASE_URL || '').replace(/\/+$/, '');
-  const dsKey = env.DEEPSEEK_API_KEY || '';
-  const dsModel = env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
   const map = {};
-  map[dsModel] = { targetUrl: dsBase + '/chat/completions', apiKey: dsKey };
+
+  const ocBase = (env.OPENCODE_BASE_URL || '').replace(/\/+$/, '');
+  const ocKey = env.OPENCODE_API_KEY || '';
+  if (ocBase && ocKey) {
+    ['minimax-m2.5-free', 'hy3-preview-free', 'nemotron-3-super-free'].forEach(function(m) {
+      map[m] = { targetUrl: ocBase + '/chat/completions', apiKey: ocKey };
+    });
+  }
+
   return map;
 }
 
@@ -113,11 +111,10 @@ function handleClaudeCodeRequest(parsed, res) {
     : userMsg.content;
 
   const modelValue = parsed.model || 'claude-sonnet-4-6';
-  const cliModel = CLAUDE_MODEL_ALIAS[modelValue] || modelValue;
 
   const args = [
     '-p', fullPrompt,
-    '--model', cliModel,
+    '--model', modelValue,
     '--output-format', 'stream-json',
     '--bare',
     '--verbose',
@@ -449,7 +446,7 @@ const server = http.createServer((req, res) => {
   res.end(JSON.stringify({ error: 'not found' }));
 });
 
-module.exports = { loadEnv, buildModelMap, CLAUDE_MODELS, CLAUDE_MODEL_ALIAS };
+module.exports = { loadEnv, buildModelMap, CLAUDE_MODELS };
 
 if (require.main === module) {
   server.listen(PROXY_PORT, () => {

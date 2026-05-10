@@ -1,0 +1,17 @@
+{
+  "name": "frontend-benchmark",
+  "version": "1.0.0",
+  "description": "LLM 模型前端代码生成能力的可视化对比评测工具",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "npx playwright test",
+    "test:ui": "npx playwright test --ui"
+  },
+  "keywords": ["benchmark", "llm", "frontend", "evaluation", "comparison"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

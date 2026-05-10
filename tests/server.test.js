@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 
-const { loadEnv, buildModelMap, CLAUDE_MODELS, CLAUDE_MODEL_ALIAS } = require('../server');
+const { loadEnv, buildModelMap, CLAUDE_MODELS } = require('../server');
 
 // ===== server.js 单元测试 =====
 
@@ -19,27 +19,41 @@ describe('server.js - loadEnv()', () => {
       if (m && !line.startsWith('#')) env[m[1]] = m[2].replace(/^["']|["']$/g, '');
     });
 
-    assert.ok(env.DEEPSEEK_API_KEY, 'DEEPSEEK_API_KEY should be set');
-    assert.equal(env.DEEPSEEK_BASE_URL, 'https://api.deepseek.com/v1');
+    assert.ok(env.OPENCODE_API_KEY, 'OPENCODE_API_KEY should be set');
+    assert.equal(env.OPENCODE_BASE_URL, 'https://opencode.ai/zen/v1');
   });
 
   it('should strip quotes from values', () => {
-    const result = 'deepseek-v4-flash'.replace(/^["']|["']$/g, '');
-    assert.equal(result, 'deepseek-v4-flash');
+    const result = 'minimax-m2.5-free'.replace(/^["']|["']$/g, '');
+    assert.equal(result, 'minimax-m2.5-free');
   });
 });
 
 describe('server.js - buildModelMap()', () => {
   it('should build correct model mapping from env', () => {
     const env = {
-      DEEPSEEK_BASE_URL: 'https://api.deepseek.com/v1',
-      DEEPSEEK_API_KEY: 'ds-key-456',
-      DEEPSEEK_MODEL: 'deepseek-v4-flash',
+      OPENCODE_BASE_URL: 'https://opencode.ai/zen/v1',
+      OPENCODE_API_KEY: 'oc-test-key',
     };
     const map = buildModelMap(env);
 
-    assert.equal(map['deepseek-v4-flash'].targetUrl, 'https://api.deepseek.com/v1/chat/completions');
-    assert.equal(map['deepseek-v4-flash'].apiKey, 'ds-key-456');
+    assert.equal(map['minimax-m2.5-free'].targetUrl, 'https://opencode.ai/zen/v1/chat/completions');
+    assert.equal(map['minimax-m2.5-free'].apiKey, 'oc-test-key');
+    assert.equal(map['hy3-preview-free'].targetUrl, 'https://opencode.ai/zen/v1/chat/completions');
+    assert.equal(map['nemotron-3-super-free'].targetUrl, 'https://opencode.ai/zen/v1/chat/completions');
+  });
+
+  it('should build OpenCode model mapping when env vars are set', () => {
+    const env = {
+      OPENCODE_BASE_URL: 'https://opencode.ai/zen/v1',
+      OPENCODE_API_KEY: 'oc-test-key',
+    };
+    const map = buildModelMap(env);
+
+    assert.equal(map['minimax-m2.5-free'].targetUrl, 'https://opencode.ai/zen/v1/chat/completions');
+    assert.equal(map['minimax-m2.5-free'].apiKey, 'oc-test-key');
+    assert.equal(map['hy3-preview-free'].targetUrl, 'https://opencode.ai/zen/v1/chat/completions');
+    assert.equal(map['nemotron-3-super-free'].targetUrl, 'https://opencode.ai/zen/v1/chat/completions');
   });
 
   it('should handle missing env values gracefully', () => {
@@ -58,8 +72,8 @@ describe('prompts.json validation', () => {
     prompts = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'prompts.json'), 'utf-8'));
   });
 
-  it('should have 4 models', () => {
-    assert.equal(prompts.models.length, 4);
+  it('should have 6 models', () => {
+    assert.equal(prompts.models.length, 6);
   });
 
   it('should have 8 prompts', () => {
@@ -241,11 +255,15 @@ describe('CLAUDE_MODELS set', () => {
   });
 });
 
-describe('CLAUDE_MODEL_ALIAS mapping', () => {
-  it('should map claude IDs to glm CLI aliases', () => {
-    assert.equal(CLAUDE_MODEL_ALIAS['claude-haiku-4-5-20251001'], 'glm-4.7');
-    assert.equal(CLAUDE_MODEL_ALIAS['claude-sonnet-4-6'], 'glm-5-turbo');
-    assert.equal(CLAUDE_MODEL_ALIAS['claude-opus-4-7'], 'glm-5.1');
+describe('CLAUDE_MODELS - no GLM aliases', () => {
+  it('should not contain GLM model IDs', () => {
+    assert.ok(!CLAUDE_MODELS.has('glm-5.1'));
+    assert.ok(!CLAUDE_MODELS.has('glm-5-turbo'));
+    assert.ok(!CLAUDE_MODELS.has('glm-4.7'));
+  });
+
+  it('should not contain external model IDs', () => {
+    assert.ok(!CLAUDE_MODELS.has('deepseek-v4-flash'));
   });
 });
 

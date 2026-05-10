@@ -4,10 +4,12 @@ const BASE_URL = 'http://127.0.0.1:3457';
 
 function mockSSE(modelId) {
     const responses = {
-    'deepseek-v4-flash': 'UNIQUE_RESPONSE_DEEPSEEK_V4_FLASH',
     'claude-opus-4-7': 'UNIQUE_RESPONSE_CLAUDE_OPUS_4_7',
     'claude-sonnet-4-6': 'UNIQUE_RESPONSE_CLAUDE_SONNET_4_6',
     'claude-haiku-4-5-20251001': 'UNIQUE_RESPONSE_CLAUDE_HAIKU_4_5',
+    'minimax-m2.5-free': 'UNIQUE_RESPONSE_MINIMAX_M2_5_FREE',
+    'hy3-preview-free': 'UNIQUE_RESPONSE_HY3_PREVIEW_FREE',
+    'nemotron-3-super-free': 'UNIQUE_RESPONSE_NEMOTRON_3_SUPER_FREE',
   };
   const text = responses[modelId] || 'UNIQUE_RESPONSE_UNKNOWN';
   const chunks = text.split(' ');
@@ -254,7 +256,7 @@ test.describe('Benchmark Tool E2E', () => {
     const val0 = await page.locator('#select-0').inputValue();
     const val1 = await page.locator('#select-1').inputValue();
 
-    const validIds = ['deepseek-v4-flash', 'claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
+    const validIds = ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001', 'minimax-m2.5-free', 'hy3-preview-free', 'nemotron-3-super-free'];
     expect(validIds).toContain(val0);
     expect(validIds).toContain(val1);
     expect(val0).not.toBe(val1);
@@ -289,10 +291,12 @@ test.describe('Benchmark Tool E2E', () => {
     const source1Text = await page.locator('#source-code-1').textContent();
 
     const expectedResponse = {
-      'deepseek-v4-flash': 'UNIQUE_RESPONSE_DEEPSEEK_V4_FLASH',
       'claude-opus-4-7': 'UNIQUE_RESPONSE_CLAUDE_OPUS_4_7',
       'claude-sonnet-4-6': 'UNIQUE_RESPONSE_CLAUDE_SONNET_4_6',
       'claude-haiku-4-5-20251001': 'UNIQUE_RESPONSE_CLAUDE_HAIKU_4_5',
+      'minimax-m2.5-free': 'UNIQUE_RESPONSE_MINIMAX_M2_5_FREE',
+      'hy3-preview-free': 'UNIQUE_RESPONSE_HY3_PREVIEW_FREE',
+      'nemotron-3-super-free': 'UNIQUE_RESPONSE_NEMOTRON_3_SUPER_FREE',
     };
 
     expect(source0Text).toContain(expectedResponse[assigned0]);
@@ -399,7 +403,7 @@ test.describe('Benchmark Tool E2E', () => {
     const val1 = await page.locator('#select-1').inputValue();
     const val2 = await page.locator('#select-2').inputValue();
 
-    const validIds = ['deepseek-v4-flash', 'claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
+    const validIds = ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001', 'minimax-m2.5-free', 'hy3-preview-free', 'nemotron-3-super-free'];
     expect(validIds).toContain(val0);
     expect(validIds).toContain(val1);
     expect(validIds).toContain(val2);
@@ -418,19 +422,19 @@ test.describe('Benchmark Tool E2E', () => {
 
   test('非盲评模式下生成使用下拉框选中的模型', async ({ page }) => {
     await page.locator('#select-0').selectOption('claude-sonnet-4-6');
-    await page.locator('#select-1').selectOption('deepseek-v4-flash');
+    await page.locator('#select-1').selectOption('minimax-m2.5-free');
     await page.locator('.tc-item').first().click();
 
     await page.click('button:has-text("全部生成")');
     await expect(page.locator('#stats-0')).toContainText('tok', { timeout: 10000 });
 
     expect(capturedModelRequests).toContain('claude-sonnet-4-6');
-    expect(capturedModelRequests).toContain('deepseek-v4-flash');
+    expect(capturedModelRequests).toContain('minimax-m2.5-free');
 
     const source0Text = await page.locator('#source-code-0').textContent();
     const source1Text = await page.locator('#source-code-1').textContent();
     expect(source0Text).toContain('UNIQUE_RESPONSE_CLAUDE_SONNET_4_6');
-    expect(source1Text).toContain('UNIQUE_RESPONSE_DEEPSEEK_V4_FLASH');
+    expect(source1Text).toContain('UNIQUE_RESPONSE_MINIMAX_M2_5_FREE');
   });
 
   // ===== 评分功能 =====
@@ -497,7 +501,7 @@ test.describe('Benchmark Tool E2E', () => {
     await expect(page.locator('#batch-progress')).toBeVisible();
 
     await expect(page.locator('#batch-run-btn')).not.toBeDisabled({ timeout: 60000 });
-    await expect(page.locator('#status-text')).toContainText('批量运行完成');
+    await expect(page.locator('#status-text')).toContainText('批量完成');
   });
 
   // ===== 导出功能 =====
@@ -587,7 +591,7 @@ test.describe('Benchmark Tool E2E', () => {
             prompt_name: '<img src=x onerror=alert(1)>',
             prompt_id: 'xss-test',
             model_scores: [
-              { model_id: 'deepseek-v4-flash', model_name: '<script>alert("xss")</script>', pass_rate: 1, pass_count: 3, partial_count: 0, fail_count: 0 },
+              { model_id: 'minimax-m2.5-free', model_name: '<script>alert("xss")</script>', pass_rate: 1, pass_count: 3, partial_count: 0, fail_count: 0 },
             ],
             timestamp: new Date().toISOString(),
           });
@@ -641,7 +645,7 @@ test.describe('Benchmark Tool E2E', () => {
   test('状态栏显示就绪消息和模型列表', async ({ page }) => {
     const statusText = page.locator('#status-text');
     await expect(statusText).toContainText('就绪');
-    await expect(statusText).toContainText('GLM');
+    await expect(statusText).toContainText('Claude');
   });
 
   // ===== Claude Code 路由 =====
@@ -659,22 +663,22 @@ test.describe('Benchmark Tool E2E', () => {
     expect(sourceText).toContain('UNIQUE_RESPONSE_CLAUDE_SONNET_4_6');
   });
 
-  test('混合模型：Claude + DeepSeek 并行生成', async ({ page }) => {
+  test('混合模型：Claude + OpenCode 并行生成', async ({ page }) => {
     await page.locator('.tc-item').first().click();
     await page.locator('#select-0').selectOption('claude-opus-4-7');
-    await page.locator('#select-1').selectOption('deepseek-v4-flash');
+    await page.locator('#select-1').selectOption('minimax-m2.5-free');
 
     await page.click('button:has-text("全部生成")');
     await expect(page.locator('#stats-0')).toContainText('tok', { timeout: 10000 });
     await expect(page.locator('#stats-1')).toContainText('tok', { timeout: 10000 });
 
     expect(capturedModelRequests).toContain('claude-opus-4-7');
-    expect(capturedModelRequests).toContain('deepseek-v4-flash');
+    expect(capturedModelRequests).toContain('minimax-m2.5-free');
 
     const source0 = await page.locator('#source-code-0').textContent();
     const source1 = await page.locator('#source-code-1').textContent();
     expect(source0).toContain('UNIQUE_RESPONSE_CLAUDE_OPUS_4_7');
-    expect(source1).toContain('UNIQUE_RESPONSE_DEEPSEEK_V4_FLASH');
+    expect(source1).toContain('UNIQUE_RESPONSE_MINIMAX_M2_5_FREE');
     expect(source0).not.toBe(source1);
   });
 
