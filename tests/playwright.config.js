@@ -6,15 +6,15 @@ export default defineConfig({
   timeout: 30000,
   retries: 0,
   use: {
-    baseURL: 'http://localhost:3457',
+    baseURL: 'http://127.0.0.1:3457',
     headless: true,
     viewport: { width: 1440, height: 900 },
     actionTimeout: 5000,
   },
   webServer: [
     {
-      command: 'node bechmark/tests/e2e-setup.js',
-      cwd: path.resolve(__dirname, '..', '..'),
+      command: 'node tests/e2e-setup.js',
+      cwd: path.resolve(__dirname, '..'),
       port: 3457,
       reuseExistingServer: false,
       timeout: 10000,

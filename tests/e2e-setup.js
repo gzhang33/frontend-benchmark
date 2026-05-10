@@ -93,6 +93,6 @@ const server = http.createServer((req, res) => {
   res.end('not found');
 });
 
-server.listen(PORT, () => {
-  console.log('E2E test server running at http://localhost:' + PORT);
+server.listen(PORT, '127.0.0.1', () => {
+  console.log('E2E test server running at http://127.0.0.1:' + PORT);
 });
